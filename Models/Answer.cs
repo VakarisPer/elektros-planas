@@ -12,4 +12,7 @@ public sealed class Answer
 
     /// <summary>Free-text answer typed by the user.</summary>
     public string? CustomText { get; set; }
+
+    /// <summary>True when the answer was filled automatically from an uploaded file.</summary>
+    public bool IsAuto { get; set; }
 }

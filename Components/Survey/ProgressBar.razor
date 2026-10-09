@@ -1,8 +1,5 @@
-<div class="mb-3">
-    <div class="d-flex justify-content-between small text-muted">
-        <span>@Step žingsnis iš @TotalSteps</span>
-        <span>@Title</span>
-    </div>
+<div class="mb-2">
+    <div class="small text-muted">Klausimas @Current iš @Total</div>
     <div class="progress mt-1"
          role="progressbar"
          aria-label="Apklausos progresas"
@@ -16,13 +13,10 @@
 
 @code {
     [Parameter]
-    public int Step { get; set; }
+    public int Current { get; set; }
 
     [Parameter]
-    public int TotalSteps { get; set; }
+    public int Total { get; set; }
 
-    [Parameter]
-    public string Title { get; set; } = string.Empty;
-
-    private int Percent => TotalSteps <= 0 ? 0 : (int)Math.Round(Step * 100.0 / TotalSteps);
+    private int Percent => Total <= 0 ? 0 : (int)Math.Round(Current * 100.0 / Total);
 }

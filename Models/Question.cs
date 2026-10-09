@@ -13,7 +13,8 @@ public sealed class Question
 
     public int Id { get; init; }
 
-    public int Step { get; init; }
+    /// <summary>Grouping label shown as the page heading (e.g. "Didieji vartotojai").</summary>
+    public string Section { get; init; } = string.Empty;
 
     public string Text { get; init; } = string.Empty;
 
@@ -27,4 +28,10 @@ public sealed class Question
 
     /// <summary>When true the "other (type your own)" choice is offered.</summary>
     public bool AllowCustom { get; init; } = true;
+
+    /// <summary>
+    /// Conditions that decide whether this question is relevant. All conditions are
+    /// combined with AND. Empty means the question is always shown (tree root).
+    /// </summary>
+    public IReadOnlyList<ShowCondition> ShowWhen { get; init; } = Array.Empty<ShowCondition>();
 }

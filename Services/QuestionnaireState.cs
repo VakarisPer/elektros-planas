@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.JSInterop;
 using vamos.Data;
@@ -6,20 +8,33 @@ using vamos.Models;
 namespace vamos.Services;
 
 /// <summary>
-/// Holds the answers of the current survey session and persists them to localStorage.
-/// Registered as scoped, so one instance per interactive circuit.
+/// Holds the answers of the current survey session, walks the question tree and
+/// persists everything to localStorage. Registered as scoped (one per circuit).
 /// </summary>
 public sealed class QuestionnaireState
 {
-    private const string StorageKey = "elektros-planai.survey.v1";
+    private const string StorageKey = "elektros-planai.survey.v2";
+
+    private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
 
     private readonly ProtectedLocalStorage _storage;
+    private readonly SubmissionWriter _writer;
     private readonly Dictionary<int, Answer> _answers = new();
     private bool _loaded;
 
-    public QuestionnaireState(ProtectedLocalStorage storage) => _storage = storage;
+    public QuestionnaireState(ProtectedLocalStorage storage, SubmissionWriter writer)
+    {
+        _storage = storage;
+        _writer = writer;
+    }
 
-    public int CurrentStep { get; set; } = 1;
+    public int CurrentQuestionId { get; set; } = Questionnaire.FirstQuestionId;
+
+    public ConsumptionAnalysis? Analysis { get; set; }
+
+    public string? LastSavedPath { get; set; }
+
+    // ── Answer access ───────────────────────────────────────────────────
 
     public Answer GetAnswer(int questionId)
     {
@@ -32,88 +47,25 @@ public sealed class QuestionnaireState
         return answer;
     }
 
-    public async Task LoadAsync()
-    {
-        if (_loaded)
-        {
-            return;
-        }
-
-        _loaded = true;
-
-        try
-        {
-            var result = await _storage.GetAsync<SurveySnapshot>(StorageKey);
-            if (result.Success && result.Value is { } snapshot)
-            {
-                _answers.Clear();
-                foreach (var answer in snapshot.Answers)
-                {
-                    _answers[answer.QuestionId] = answer;
-                }
-
-                CurrentStep = snapshot.CurrentStep;
-            }
-        }
-        catch (JSException)
-        {
-            // JS interop is not available yet (e.g. during prerendering).
-        }
-        catch (InvalidOperationException)
-        {
-            // ProtectedBrowserStorage cannot be used in this rendering mode.
-        }
-    }
-
-    public async Task SaveAsync()
-    {
-        var snapshot = new SurveySnapshot
-        {
-            Answers = _answers.Values.ToList(),
-            CurrentStep = CurrentStep
-        };
-
-        try
-        {
-            await _storage.SetAsync(StorageKey, snapshot);
-        }
-        catch (JSException)
-        {
-        }
-        catch (InvalidOperationException)
-        {
-        }
-    }
-
-    public async Task ResetAsync()
-    {
-        _answers.Clear();
-        CurrentStep = 1;
-
-        try
-        {
-            await _storage.DeleteAsync(StorageKey);
-        }
-        catch (JSException)
-        {
-        }
-        catch (InvalidOperationException)
-        {
-        }
-    }
-
-    public void SetSingle(int questionId, string option)
+    public void SetSingle(int questionId, string option, bool isAuto = false)
     {
         var answer = GetAnswer(questionId);
         answer.SelectedOptions.Clear();
         answer.SelectedOptions.Add(option);
+        answer.IsAuto = isAuto;
     }
 
-    public void ClearSelection(int questionId) => GetAnswer(questionId).SelectedOptions.Clear();
+    public void ClearSelection(int questionId)
+    {
+        var answer = GetAnswer(questionId);
+        answer.SelectedOptions.Clear();
+        answer.IsAuto = false;
+    }
 
     public void ToggleMulti(int questionId, string option, bool isChecked, string? exclusiveOption)
     {
         var answer = GetAnswer(questionId);
+        answer.IsAuto = false;
 
         if (!isChecked)
         {
@@ -139,8 +91,15 @@ public sealed class QuestionnaireState
         }
     }
 
-    public void SetCustomText(int questionId, string? text) =>
-        GetAnswer(questionId).CustomText = text;
+    public void SetCustomText(int questionId, string? text)
+    {
+        var answer = GetAnswer(questionId);
+        answer.CustomText = text;
+        answer.IsAuto = false;
+    }
+
+    /// <summary>Fills a single-choice answer automatically (from the uploaded file).</summary>
+    public void SetAutoAnswer(int questionId, string option) => SetSingle(questionId, option, isAuto: true);
 
     public bool IsQuestionAnswered(Question question)
     {
@@ -149,11 +108,239 @@ public sealed class QuestionnaireState
         return hasConcreteOption || !string.IsNullOrWhiteSpace(answer.CustomText);
     }
 
-    public bool IsStepComplete(int stepNumber)
+    // ── Tree walking ────────────────────────────────────────────────────
+
+    public bool IsVisible(Question question) => question.ShowWhen.All(ConditionHolds);
+
+    private bool ConditionHolds(ShowCondition condition)
     {
-        var step = Questionnaire.GetStep(stepNumber);
-        return step is not null && step.Questions.All(IsQuestionAnswered);
+        var answer = GetAnswer(condition.QuestionId);
+        var answered = answer.SelectedOptions.Count > 0 || !string.IsNullOrWhiteSpace(answer.CustomText);
+
+        // A question whose dependency is not answered yet is not shown.
+        if (!answered)
+        {
+            return false;
+        }
+
+        if (condition.HasAny is { Count: > 0 } any && !any.Any(answer.SelectedOptions.Contains))
+        {
+            return false;
+        }
+
+        if (condition.HasNone is { Count: > 0 } none && none.Any(answer.SelectedOptions.Contains))
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    public bool IsComplete => Questionnaire.Steps.All(s => s.Questions.All(IsQuestionAnswered));
+    public IReadOnlyList<Question> VisibleQuestions() =>
+        Questionnaire.Questions.Where(IsVisible).ToList();
+
+    public int VisibleCount => VisibleQuestions().Count;
+
+    public int PositionOf(int questionId)
+    {
+        var index = VisibleQuestions().ToList().FindIndex(q => q.Id == questionId);
+        return index < 0 ? 0 : index + 1;
+    }
+
+    public int? PreviousVisibleId(int questionId)
+    {
+        Question? previous = null;
+        foreach (var question in Questionnaire.Questions)
+        {
+            if (question.Id == questionId)
+            {
+                break;
+            }
+
+            if (IsVisible(question))
+            {
+                previous = question;
+            }
+        }
+
+        return previous?.Id;
+    }
+
+    public int? NextVisibleId(int questionId)
+    {
+        var found = false;
+        foreach (var question in Questionnaire.Questions)
+        {
+            if (found)
+            {
+                if (IsVisible(question))
+                {
+                    return question.Id;
+                }
+            }
+            else if (question.Id == questionId)
+            {
+                found = true;
+            }
+        }
+
+        return null;
+    }
+
+    public int? FirstVisibleUnansweredId() =>
+        Questionnaire.Questions.Where(IsVisible).Where(q => !IsQuestionAnswered(q))
+            .Select(q => (int?)q.Id).FirstOrDefault();
+
+    /// <summary>Nearest visible question at or before the given one; used when it became hidden.</summary>
+    public int NearestVisibleId(int questionId)
+    {
+        int? last = null;
+        foreach (var question in Questionnaire.Questions)
+        {
+            if (IsVisible(question))
+            {
+                last = question.Id;
+            }
+
+            if (question.Id == questionId)
+            {
+                break;
+            }
+        }
+
+        return last ?? VisibleQuestions().Select(q => q.Id).FirstOrDefault();
+    }
+
+    public bool IsComplete => VisibleQuestions().All(IsQuestionAnswered);
+
+    // ── Persistence ─────────────────────────────────────────────────────
+
+    public async Task LoadAsync()
+    {
+        if (_loaded)
+        {
+            return;
+        }
+
+        _loaded = true;
+
+        try
+        {
+            var result = await _storage.GetAsync<SurveySnapshot>(StorageKey);
+            if (result.Success && result.Value is { } snapshot)
+            {
+                _answers.Clear();
+                foreach (var answer in snapshot.Answers)
+                {
+                    _answers[answer.QuestionId] = answer;
+                }
+
+                CurrentQuestionId = snapshot.CurrentQuestionId;
+                Analysis = snapshot.Analysis;
+                LastSavedPath = snapshot.LastSavedPath;
+            }
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    public async Task SaveAsync()
+    {
+        var snapshot = new SurveySnapshot
+        {
+            Answers = _answers.Values.ToList(),
+            CurrentQuestionId = CurrentQuestionId,
+            Analysis = Analysis,
+            LastSavedPath = LastSavedPath
+        };
+
+        try
+        {
+            await _storage.SetAsync(StorageKey, snapshot);
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    public async Task ResetAsync()
+    {
+        _answers.Clear();
+        CurrentQuestionId = Questionnaire.FirstQuestionId;
+        Analysis = null;
+        LastSavedPath = null;
+
+        try
+        {
+            await _storage.DeleteAsync(StorageKey);
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    // ── Submission (.txt) ───────────────────────────────────────────────
+
+    public async Task<string> SubmitAsync()
+    {
+        var path = await _writer.WriteAsync(BuildTextReport());
+        LastSavedPath = path;
+        await SaveAsync();
+        return path;
+    }
+
+    public string BuildTextReport()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Elektros plano apklausos atsakymai");
+        sb.AppendLine($"Data: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+        if (Analysis is { Success: true } a)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Įkelto failo analizė:");
+            sb.AppendLine($"  Failas: {a.FileName}");
+            sb.AppendLine($"  Įrašų: {a.Readings}, mėnesių: {a.Months}");
+            if (a.MonthlyAverageKwh is { } avg)
+            {
+                sb.AppendLine($"  Vidutiniškai: {avg.ToString("0.0", Lt)} kWh/mėn.");
+            }
+            if (a.NightShare is { } night)
+            {
+                sb.AppendLine($"  Naktinis suvartojimas: {(night * 100).ToString("0", Lt)}%");
+            }
+        }
+
+        string? section = null;
+        foreach (var question in Questionnaire.Questions.Where(IsVisible))
+        {
+            if (question.Section != section)
+            {
+                section = question.Section;
+                sb.AppendLine();
+                sb.AppendLine($"[{section}]");
+            }
+
+            var answer = GetAnswer(question.Id);
+            var marker = answer.IsAuto ? "   (automatinis)" : string.Empty;
+            sb.AppendLine($"{question.Id}. {question.Text}");
+            sb.AppendLine($"   Atsakymas: {FormatAnswer(answer)}{marker}");
+        }
+
+        return sb.ToString();
+    }
+
+    public static string FormatAnswer(Answer answer)
+    {
+        var parts = answer.SelectedOptions
+            .Select(o => o == Question.CustomOption ? answer.CustomText : o)
+            .Where(o => !string.IsNullOrWhiteSpace(o))
+            .Select(o => o!)
+            .ToList();
+
+        if (parts.Count == 0 && !string.IsNullOrWhiteSpace(answer.CustomText))
+        {
+            parts.Add(answer.CustomText!);
+        }
+
+        return parts.Count == 0 ? "—" : string.Join(", ", parts);
+    }
 }

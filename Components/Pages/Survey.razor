@@ -1,94 +1,127 @@
 @page "/survey"
-@page "/survey/{Step:int}"
+@page "/survey/{QuestionId:int}"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject QuestionnaireState State
 @inject NavigationManager Nav
 
 <PageTitle>Apklausa</PageTitle>
 
-@if (_step is null)
+@if (_question is null)
 {
     <p class="text-muted">Kraunama…</p>
 }
 else
 {
-    <ProgressBar Step="_step.Number" TotalSteps="Questionnaire.TotalSteps" Title="_step.Title" />
+    <ProgressBar Current="State.PositionOf(_question.Id)" Total="State.VisibleCount" />
 
-    <h1 class="h4 mt-3">@_step.Title</h1>
+    <h1 class="h4 mt-3">@_question.Section</h1>
 
-    @foreach (var question in _step.Questions)
+    @if (Answer.IsAuto)
     {
-        <QuestionCard Question="question"
-                      Answer="State.GetAnswer(question.Id)"
-                      OnAnswerChanged="StateHasChanged" />
+        <span class="badge text-bg-info mb-2">Automatinis atsakymas (iš įkelto failo) – galite pataisyti</span>
     }
 
-    <div class="d-flex justify-content-between mt-4">
+    <QuestionCard Question="_question" Answer="Answer" OnAnswerChanged="StateHasChanged" />
+
+    <div class="d-flex justify-content-between mt-3">
         <button type="button"
                 class="btn btn-outline-secondary"
-                disabled="@(_step.Number <= 1)"
+                disabled="@(PreviousId is null)"
                 @onclick="GoBack">
             ← Atgal
         </button>
 
         <button type="button"
                 class="btn btn-primary"
-                disabled="@(!CanContinue)"
+                disabled="@(!State.IsQuestionAnswered(_question))"
                 @onclick="GoNext">
             @NextLabel
         </button>
     </div>
 
-    @if (!CanContinue)
+    @if (!State.IsQuestionAnswered(_question))
     {
-        <p class="text-muted small mt-2 mb-0">
-            Atsakykite į visus šio žingsnio klausimus, kad galėtumėte tęsti.
-        </p>
+        <p class="text-muted small mt-2 mb-0">Pasirinkite atsakymą, kad galėtumėte tęsti.</p>
     }
 }
 
 @code {
     [Parameter]
-    public int Step { get; set; }
+    public int QuestionId { get; set; }
 
-    private SurveyStep? _step;
+    private Question? _question;
 
-    private bool CanContinue => _step is not null && State.IsStepComplete(_step.Number);
+    private Answer Answer => State.GetAnswer(_question!.Id);
 
-    private string NextLabel => _step?.Number == Questionnaire.TotalSteps ? "Baigti" : "Toliau →";
+    private int? PreviousId => _question is null ? null : State.PreviousVisibleId(_question.Id);
+
+    private int? NextId => _question is null ? null : State.NextVisibleId(_question.Id);
+
+    private string NextLabel => NextId is null ? "Baigti" : "Toliau →";
 
     protected override async Task OnParametersSetAsync()
     {
         await State.LoadAsync();
 
-        if (Step < 1 || Step > Questionnaire.TotalSteps)
+        if (QuestionId <= 0)
         {
-            Nav.NavigateTo("/survey/1", replace: true);
+            var resume = State.FirstVisibleUnansweredId() ?? Questionnaire.FirstQuestionId;
+            Nav.NavigateTo($"/survey/{resume}");
             return;
         }
 
-        _step = Questionnaire.GetStep(Step);
-        State.CurrentStep = Step;
+        var question = Questionnaire.GetQuestion(QuestionId);
+        if (question is null)
+        {
+            Nav.NavigateTo($"/survey/{Questionnaire.FirstQuestionId}", replace: true);
+            return;
+        }
+
+        // The tree may have changed while navigating back - skip hidden questions.
+        if (!State.IsVisible(question))
+        {
+            Nav.NavigateTo($"/survey/{State.NearestVisibleId(QuestionId)}", replace: true);
+            return;
+        }
+
+        _question = question;
+        State.CurrentQuestionId = QuestionId;
         await State.SaveAsync();
     }
 
     private void GoBack()
     {
-        if (_step is not null && _step.Number > 1)
+        if (PreviousId is { } id)
         {
-            Nav.NavigateTo($"/survey/{_step.Number - 1}");
+            Nav.NavigateTo($"/survey/{id}");
         }
     }
 
-    private void GoNext()
+    private async Task GoNext()
     {
-        if (_step is null || !CanContinue)
+        if (_question is null)
         {
             return;
         }
 
-        Nav.NavigateTo(_step.Number >= Questionnaire.TotalSteps
-            ? "/results"
-            : $"/survey/{_step.Number + 1}");
+        if (NextId is { } id)
+        {
+            Nav.NavigateTo($"/survey/{id}");
+            return;
+        }
+
+        // Last visible question - make sure nothing was left unanswered out of order.
+        if (!State.IsComplete)
+        {
+            var missing = State.FirstVisibleUnansweredId();
+            if (missing is { } first && first != _question.Id)
+            {
+                Nav.NavigateTo($"/survey/{first}");
+                return;
+            }
+        }
+
+        await State.SubmitAsync();
+        Nav.NavigateTo("/results");
     }
 }

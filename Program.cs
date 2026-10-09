@@ -9,6 +9,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddScoped<ProtectedLocalStorage>();
+builder.Services.AddScoped<SubmissionWriter>();
+builder.Services.AddScoped<ConsumptionAnalyzer>();
 builder.Services.AddScoped<QuestionnaireState>();
 
 var app = builder.Build();
