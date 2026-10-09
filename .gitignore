@@ -1,0 +1,114 @@
+# ============================================================
+# .NET / ASP.NET Core / Blazor  (.gitignore)
+# ============================================================
+
+## Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.sln.iml
+
+## MSBuild / NuGet
+*.binlog
+*.nupkg
+*.snupkg
+*.nuspec
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Test / coverage
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+TestResults/
+
+## Publish output
+publish/
+PublishScripts/
+*.publishsettings
+*.pubxml
+*.pubxml.user
+*.publishproj
+
+## Entity Framework / user data
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.mdf
+*.ldf
+*.ndf
+*.sqlite
+*.sqlite3
+app.db
+
+## User-specific / secrets
+appsettings.*.local.json
+secrets.json
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+
+## Azure / cloud publish profiles
+*.azurePubxml
+*.azurepubxml
+ServiceConfiguration.*.cscfg
+ServiceConfiguration.*.cscfg.user
+ServiceDefinition.csdef
+ServiceDefinition.csdef.user
+
+## Windows / OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+.DS_Store
+
+## Node (jei naudosit front-end įrankius / npm)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.eslintcache
+
+## Python (jei bus duomenų apdorojimo skriptų)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+## Duomenų rinkmenos, kurių neversionuojame (dideli / privatūs vartojimo duomenys)
+data/raw/
+data/private/
+*.private.*
