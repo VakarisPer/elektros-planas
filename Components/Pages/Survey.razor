@@ -1,0 +1,94 @@
+@page "/survey"
+@page "/survey/{Step:int}"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject QuestionnaireState State
+@inject NavigationManager Nav
+
+<PageTitle>Apklausa</PageTitle>
+
+@if (_step is null)
+{
+    <p class="text-muted">Kraunama…</p>
+}
+else
+{
+    <ProgressBar Step="_step.Number" TotalSteps="Questionnaire.TotalSteps" Title="_step.Title" />
+
+    <h1 class="h4 mt-3">@_step.Title</h1>
+
+    @foreach (var question in _step.Questions)
+    {
+        <QuestionCard Question="question"
+                      Answer="State.GetAnswer(question.Id)"
+                      OnAnswerChanged="StateHasChanged" />
+    }
+
+    <div class="d-flex justify-content-between mt-4">
+        <button type="button"
+                class="btn btn-outline-secondary"
+                disabled="@(_step.Number <= 1)"
+                @onclick="GoBack">
+            ← Atgal
+        </button>
+
+        <button type="button"
+                class="btn btn-primary"
+                disabled="@(!CanContinue)"
+                @onclick="GoNext">
+            @NextLabel
+        </button>
+    </div>
+
+    @if (!CanContinue)
+    {
+        <p class="text-muted small mt-2 mb-0">
+            Atsakykite į visus šio žingsnio klausimus, kad galėtumėte tęsti.
+        </p>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Step { get; set; }
+
+    private SurveyStep? _step;
+
+    private bool CanContinue => _step is not null && State.IsStepComplete(_step.Number);
+
+    private string NextLabel => _step?.Number == Questionnaire.TotalSteps ? "Baigti" : "Toliau →";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await State.LoadAsync();
+
+        if (Step < 1 || Step > Questionnaire.TotalSteps)
+        {
+            Nav.NavigateTo("/survey/1", replace: true);
+            return;
+        }
+
+        _step = Questionnaire.GetStep(Step);
+        State.CurrentStep = Step;
+        await State.SaveAsync();
+    }
+
+    private void GoBack()
+    {
+        if (_step is not null && _step.Number > 1)
+        {
+            Nav.NavigateTo($"/survey/{_step.Number - 1}");
+        }
+    }
+
+    private void GoNext()
+    {
+        if (_step is null || !CanContinue)
+        {
+            return;
+        }
+
+        Nav.NavigateTo(_step.Number >= Questionnaire.TotalSteps
+            ? "/results"
+            : $"/survey/{_step.Number + 1}");
+    }
+}

@@ -1,0 +1,58 @@
+@page "/results"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject QuestionnaireState State
+@inject NavigationManager Nav
+
+<PageTitle>Rezultatai</PageTitle>
+
+<h1 class="h4">Jūsų atsakymai</h1>
+<p class="text-muted">
+    Planų palyginimas ir rekomendacija pagal šiuos duomenis bus pridėti vėliau.
+</p>
+
+@foreach (var step in Questionnaire.Steps)
+{
+    <h2 class="h6 mt-4">@step.Number. @step.Title</h2>
+    <ul class="list-group">
+        @foreach (var question in step.Questions)
+        {
+            var answer = State.GetAnswer(question.Id);
+
+            <li class="list-group-item">
+                <div class="fw-semibold">@question.Id. @question.Text</div>
+                <div>@FormatAnswer(answer)</div>
+            </li>
+        }
+    </ul>
+}
+
+<div class="d-flex gap-2 mt-4">
+    <button type="button" class="btn btn-primary" @onclick="Restart">Pildyti iš naujo</button>
+    <a class="btn btn-outline-secondary" href="/survey/@State.CurrentStep">Grįžti į apklausą</a>
+</div>
+
+@code {
+    protected override async Task OnParametersSetAsync() => await State.LoadAsync();
+
+    private static string FormatAnswer(Answer answer)
+    {
+        var parts = answer.SelectedOptions
+            .Select(o => o == Question.CustomOption ? answer.CustomText : o)
+            .Where(o => !string.IsNullOrWhiteSpace(o))
+            .Select(o => o!)
+            .ToList();
+
+        if (parts.Count == 0 && !string.IsNullOrWhiteSpace(answer.CustomText))
+        {
+            parts.Add(answer.CustomText!);
+        }
+
+        return parts.Count == 0 ? "—" : string.Join(", ", parts);
+    }
+
+    private async Task Restart()
+    {
+        await State.ResetAsync();
+        Nav.NavigateTo("/survey/1");
+    }
+}

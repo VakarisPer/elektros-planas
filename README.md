@@ -13,6 +13,7 @@ Fiksuotas ar lankstus tarifas? Ne visi žino, kuris planas jiems tinka geriausia
 ## Statusas
 
 - [x] Projekto karkasas (demo puslapiai išvalyti, liko tik titulinis)
+- [x] Apklausos vedlys (5 žingsniai, /survey/1–5) su atsakymų išsaugojimu
 - [ ] Vartojimo duomenų įkėlimas
 - [ ] Planų palyginimo logika
 - [ ] Rizikos ir naudos vertinimas
@@ -21,8 +22,18 @@ Fiksuotas ar lankstus tarifas? Ne visi žino, kuris planas jiems tinka geriausia
 ## Struktūra
 
 - `Components/Pages/Home.razor` — titulinis puslapis
-- `Models/` — projekto modeliai
-- `Services/` — verslo logika (planų palyginimas, rizikos vertinimas)
+- `Components/Pages/Survey.razor` — apklausos vedlys (`/survey/1`–`/survey/5`)
+- `Components/Pages/Results.razor` — atsakymų suvestinė (`/results`)
+- `Components/Survey/` — vedlio komponentai (`QuestionCard`, `ProgressBar`)
+- `Data/Questionnaire.cs` — visi klausimai ir pasirinkimai (vienoje vietoje)
+- `Models/` — projekto modeliai (`Question`, `Answer`, `SurveyStep`, `SurveySnapshot`)
+- `Services/QuestionnaireState.cs` — atsakymų būsena ir saugojimas (localStorage)
+
+## Atsakymų saugojimas
+
+Apklausos atsakymai saugomi naršyklės `localStorage` (raktas `elektros-planai.survey.v1`)
+per `ProtectedLocalStorage`, todėl išlieka persikrovus puslapį. Mygtukas „Pildyti iš naujo“
+rezultatų puslapyje išvalo išsaugotus atsakymus.
 
 ## Paleidimas
 

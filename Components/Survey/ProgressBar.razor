@@ -1,0 +1,28 @@
+<div class="mb-3">
+    <div class="d-flex justify-content-between small text-muted">
+        <span>@Step žingsnis iš @TotalSteps</span>
+        <span>@Title</span>
+    </div>
+    <div class="progress mt-1"
+         role="progressbar"
+         aria-label="Apklausos progresas"
+         aria-valuenow="@Percent"
+         aria-valuemin="0"
+         aria-valuemax="100"
+         style="height: 8px;">
+        <div class="progress-bar" style="width: @Percent%"></div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Step { get; set; }
+
+    [Parameter]
+    public int TotalSteps { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    private int Percent => TotalSteps <= 0 ? 0 : (int)Math.Round(Step * 100.0 / TotalSteps);
+}

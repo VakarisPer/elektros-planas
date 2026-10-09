@@ -1,0 +1,115 @@
+@inject QuestionnaireState State
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h3 class="h6 mb-1">@Question.Id. @Question.Text</h3>
+
+        @if (Question.IsMultiSelect)
+        {
+            <p class="text-muted small mb-2">Galima pasirinkti kelis variantus.</p>
+        }
+
+        <div class="mt-2">
+            @for (var i = 0; i < Question.Options.Count; i++)
+            {
+                var option = Question.Options[i];
+                var inputId = $"q-{Question.Id}-{i}";
+                var isChecked = Answer.SelectedOptions.Contains(option);
+
+                <div class="form-check">
+                    @if (Question.IsMultiSelect)
+                    {
+                        <input class="form-check-input"
+                               type="checkbox"
+                               name="q-@Question.Id"
+                               id="@inputId"
+                               checked="@isChecked"
+                               @onchange="e => OnMultiOptionChanged(option, (bool)e.Value!)" />
+                    }
+                    else
+                    {
+                        <input class="form-check-input"
+                               type="radio"
+                               name="q-@Question.Id"
+                               id="@inputId"
+                               checked="@isChecked"
+                               @onchange="() => OnSingleOptionChanged(option)" />
+                    }
+                    <label class="form-check-label" for="@inputId">@option</label>
+                </div>
+            }
+
+            @if (Question.AllowCustom)
+            {
+                var customId = $"q-{Question.Id}-custom";
+                var customSelected = Answer.SelectedOptions.Contains(Question.CustomOption);
+
+                <div class="form-check">
+                    @if (Question.IsMultiSelect)
+                    {
+                        <input class="form-check-input"
+                               type="checkbox"
+                               name="q-@Question.Id"
+                               id="@customId"
+                               checked="@customSelected"
+                               @onchange="e => OnMultiOptionChanged(Question.CustomOption, (bool)e.Value!)" />
+                    }
+                    else
+                    {
+                        <input class="form-check-input"
+                               type="radio"
+                               name="q-@Question.Id"
+                               id="@customId"
+                               checked="@customSelected"
+                               @onchange="() => OnSingleOptionChanged(Question.CustomOption)" />
+                    }
+                    <label class="form-check-label" for="@customId">Kita (įrašyti savo)</label>
+                </div>
+
+                @if (customSelected)
+                {
+                    <input type="text"
+                           class="form-control form-control-sm mt-1"
+                           value="@Answer.CustomText"
+                           placeholder="Įrašykite savo variantą"
+                           @onchange="OnCustomTextChanged" />
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Question Question { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Answer Answer { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnAnswerChanged { get; set; }
+
+    private async Task OnSingleOptionChanged(string option)
+    {
+        State.SetSingle(Question.Id, option);
+        await SaveAndNotify();
+    }
+
+    private async Task OnMultiOptionChanged(string option, bool isChecked)
+    {
+        State.ToggleMulti(Question.Id, option, isChecked, Question.ExclusiveOption);
+        await SaveAndNotify();
+    }
+
+    private async Task OnCustomTextChanged(ChangeEventArgs e)
+    {
+        State.SetCustomText(Question.Id, e.Value?.ToString());
+        await SaveAndNotify();
+    }
+
+    private async Task SaveAndNotify()
+    {
+        await State.SaveAsync();
+        await OnAnswerChanged.InvokeAsync();
+    }
+}
