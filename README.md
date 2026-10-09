@@ -12,11 +12,23 @@ Fiksuotas ar lankstus tarifas? Ne visi žino, kuris planas jiems tinka geriausia
 
 ## Statusas
 
-- [ ] Projekto karkasas
+- [x] Projekto karkasas (demo puslapiai išvalyti, liko tik titulinis)
 - [ ] Vartojimo duomenų įkėlimas
 - [ ] Planų palyginimo logika
 - [ ] Rizikos ir naudos vertinimas
 - [ ] Veikianti versija
+
+## Struktūra
+
+- `Components/Pages/Home.razor` — titulinis puslapis
+- `Models/` — projekto modeliai
+- `Services/` — verslo logika (planų palyginimas, rizikos vertinimas)
+
+## Paleidimas
+
+```bash
+dotnet run
+```
 
 ## Technologijos
 
