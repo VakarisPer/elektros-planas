@@ -1,0 +1,9 @@
+.q-note {
+    margin-top: .6rem;
+    font-size: .88rem;
+}
+
+    .q-note a {
+        margin-left: .25rem;
+        font-weight: 600;
+    }

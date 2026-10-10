@@ -21,6 +21,15 @@ else
         <a class="small" href="assistant">Pereiti prie AI asistento →</a>
     </div>
 
+    @if (State.PositionOf(_question.Id) == 1)
+    {
+        @if (State.Analysis is not { Success: true })
+        {
+            <div class="notice mb-3">📄 1 žingsnis – <a href="upload">įkelkite ESO duomenų failą</a>: suvartojimą ir skaitiklio tipą užpildysime patys, o ESO prijungimo galimybes patikrinsime automatiškai.</div>
+        }
+        <div class="notice mb-3">💬 @Questionnaire.StartNotice</div>
+    }
+
     @if (Answer.IsAuto)
     {
         <span class="pill pill-accent mb-2">Atsakyta automatiškai iš įkelto failo – galite pataisyti</span>

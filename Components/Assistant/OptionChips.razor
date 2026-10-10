@@ -2,6 +2,25 @@
 
 @* Answer picker for the assistant chat: single choice submits on click, multi choice needs "Patvirtinti". *@
 <div class="option-chips">
+@if (Question.IsFreeText)
+{
+    <textarea class="form-control free-text" rows="3" placeholder="Pvz.: kitąmet planuojame šilumos siurblį, dirbu naktinėmis pamainomis…"
+              @bind="_customText" @bind:event="oninput" disabled="@Disabled" aria-label="Papildoma informacija"></textarea>
+    <div class="multi-row">
+        <div class="chips">
+            @foreach (var option in Question.Options)
+            {
+                <button type="button" class="chip" disabled="@Disabled" @onclick="() => Pick(option)">@option</button>
+            }
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" disabled="@(Disabled || string.IsNullOrWhiteSpace(_customText))"
+                @onclick="SubmitCustom">
+            Pateikti →
+        </button>
+    </div>
+}
+else
+{
     <div class="chips">
         @foreach (var option in Question.Options)
         {
@@ -47,6 +66,7 @@
             </button>
         </div>
     }
+}
 </div>
 
 @code {

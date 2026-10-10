@@ -1,0 +1,98 @@
+@using System.Globalization
+@inject QuestionnaireState State
+@inject EsoConnectionService Eso
+
+@* ESO "Saulės elektrinės prijungimo galimybės" check. The number is sent to ESO on click or after an ESO file upload. *@
+<section class="eso-card">
+    <div class="eso-head">
+        <div>
+            <div class="eyebrow">ESO tinklas</div>
+            <h3>Saulės elektrinės prijungimo galimybės</h3>
+            <p class="muted small mb-0">
+                Preliminari ESO informacija, kiek galios galite prijungti ir atiduoti į tinklą.
+                Objekto numerį rasite ESO savitarnoje („Objektai“)@(FromFile ? " – jį radome įkeltame faile" : "").
+            </p>
+        </div>
+    </div>
+
+    <div class="eso-form">
+        <input class="form-control" inputmode="numeric" maxlength="8" placeholder="8 skaitmenų objekto numeris"
+               aria-label="ESO objekto numeris" @bind="_number" @bind:event="oninput" disabled="@_checking" />
+        <button type="button" class="btn btn-primary" @onclick="CheckAsync"
+                disabled="@(_checking || !EsoConnectionService.IsValidObjectNumber(_number))">
+            @(_checking ? "Tikrinama…" : "Tikrinti ESO")
+        </button>
+    </div>
+    <p class="muted small mt-1 mb-0">Numeris siunčiamas tik į eso.lt – paspaudus „Tikrinti ESO“ arba įkėlus ESO failą.</p>
+
+    @if (State.EsoConnection is { } info && info.ObjectNumber == _number?.Trim())
+    {
+        if (info.Success)
+        {
+            <div class="eso-kpis">
+                <div class="kpi"><div class="kpi-label">Įrengta generuojanti galia</div><div class="kpi-value">@Kw(info.InstalledGenerationKw)</div></div>
+                <div class="kpi"><div class="kpi-label">Leistina generuoti galia</div><div class="kpi-value">@Kw(info.AllowedGenerationKw)</div></div>
+                <div class="kpi"><div class="kpi-label">Leistinoji vartojimo galia</div><div class="kpi-value">@Kw(info.AllowedConsumptionKw)</div></div>
+                <div class="kpi"><div class="kpi-label">Galima apkrova naujai elektrinei</div><div class="kpi-value">@(info.AvailableCapacityKw is { } cap ? Kw(cap) : "be ribojimo")</div></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(info.Message))
+            {
+                <div class="notice notice-warn mt-2">ℹ️ @info.Message</div>
+            }
+            <p class="muted small mt-2 mb-0">
+                Šaltinis: <a href="@EsoConnectionService.PageUrl" target="_blank" rel="noopener">eso.lt</a>,
+                @info.CheckedAt.ToString("yyyy-MM-dd HH:mm"). Įvertinimas preliminarus – tikslias sąlygas ESO nustato pateikus paraišką.
+            </p>
+        }
+        else
+        {
+            <div class="notice notice-warn mt-2">@info.Error</div>
+        }
+    }
+</section>
+
+@code {
+    private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
+
+    /// <summary>Raised after a check so the page can recompute its numbers.</summary>
+    [Parameter] public EventCallback OnChecked { get; set; }
+
+    /// <summary>Object number to prefill (e.g. found in an uploaded file).</summary>
+    [Parameter] public string? ObjectNumber { get; set; }
+
+    private string? _number;
+    private bool _checking;
+
+    private bool FromFile => State.Analysis?.ObjectNumber is { } nr && nr == _number?.Trim();
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(_number))
+        {
+            _number = ObjectNumber ?? State.EsoConnection?.ObjectNumber ?? State.Analysis?.ObjectNumber;
+        }
+    }
+
+    private async Task CheckAsync()
+    {
+        if (!EsoConnectionService.IsValidObjectNumber(_number))
+        {
+            return;
+        }
+
+        _checking = true;
+        try
+        {
+            var info = await Eso.CheckAsync(_number!);
+            State.ApplyEsoConnection(info);
+            await State.SaveAsync();
+            await OnChecked.InvokeAsync();
+        }
+        finally
+        {
+            _checking = false;
+        }
+    }
+
+    private static string Kw(double? value) => value is { } v ? v.ToString("0.##", Lt) + " kW" : "—";
+}

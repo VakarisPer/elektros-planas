@@ -69,6 +69,7 @@
                     <div class="question-text">@question.Text</div>
                     @if (isPending)
                     {
+                        <QuestionNotes Question="question" OnEsoChecked="AnswerIfAutoAsync" />
                         <OptionChips Question="question" Answer="State.GetAnswer(qid)" Disabled="_busy" OnSubmit="AnswerAsync" />
                     }
                 </div>
@@ -97,7 +98,7 @@
     <div class="panel done-card">
         <div>
             <div class="eyebrow">Rekomendacija paruošta</div>
-            <div class="done-plan">@Recommendation.PlanTypeLabel(State.Recommendation!.PlanType) · @State.Recommendation.Supplier</div>
+            <div class="done-plan">@(State.Recommendation!.PlanLabel ?? Recommendation.PlanTypeLabel(State.Recommendation.PlanType) + " · " + State.Recommendation.Supplier)</div>
         </div>
         <a class="btn btn-primary btn-lg" href="results">Žiūrėti rezultatus →</a>
     </div>
@@ -166,6 +167,10 @@ else
     }
 
     private Task AnswerAsync() => RunAsync(() => Advisor.AnswerPendingAsync(_cts.Token));
+
+    /// <summary>An ESO check may answer the pending question by itself – then continue the conversation.</summary>
+    private Task AnswerIfAutoAsync() =>
+        State.PendingQuestionId is { } id && State.GetAnswer(id).IsAuto ? AnswerAsync() : Task.CompletedTask;
 
     private Task FinishNow() => RunAsync(() => Advisor.FinishNowAsync(_cts.Token));
 

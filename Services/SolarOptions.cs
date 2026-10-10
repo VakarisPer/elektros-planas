@@ -3,30 +3,19 @@ namespace vamos.Services;
 /// <summary>How a prosumer settles surplus energy with ESO / the supplier.</summary>
 public enum ProsumerScheme
 {
-    /// <summary>Surplus is "stored" in the grid and taken back later for a fee (kaupimas tinkle).</summary>
+    /// <summary>Dvipusė apskaita: export goes to a kWh bank and is taken back for an ESO fee (modes 1–4).</summary>
     NetMetering,
 
-    /// <summary>Surplus is sold at <see cref="SolarOptions.ExportPrice"/>.</summary>
-    SellSurplus
+    /// <summary>Grynasis atsiskaitymas: export earns (np − fee) into a money wallet that pays the bill.</summary>
+    NetBilling
 }
 
 /// <summary>
-/// Solar / battery economics (section "Solar"). DEMO assumptions ported from tools/solar_calc.py –
-/// verify against real installer prices, ESO tariffs and the current prosumer rules.
+/// Solar / battery investment assumptions (section "Solar"), DEMO values from tools/solar_calc.py –
+/// verify against real installer prices. Grid prices and prosumer rules live in Data/Tariffs.
 /// </summary>
 public sealed class SolarOptions
 {
-    /// <summary>ESO distribution + other per-kWh charges with VAT, EUR/kWh (avoided by self-consumption).</summary>
-    public double DistributionPrice { get; set; } = 0.085;
-
-    /// <summary>Fee per kWh taken back from the grid under net metering, EUR/kWh.</summary>
-    public double NetMeteringFee { get; set; } = 0.06;
-
-    /// <summary>Price paid for sold surplus, EUR/kWh.</summary>
-    public double ExportPrice { get; set; } = 0.06;
-
-    public ProsumerScheme DefaultScheme { get; set; } = ProsumerScheme.NetMetering;
-
     public double PvCostPerKwp { get; set; } = 1100;
 
     public double BatteryCostPerKwh { get; set; } = 550;
@@ -34,16 +23,20 @@ public sealed class SolarOptions
     /// <summary>Hybrid inverter / installation extra when a battery is added to an existing plant, EUR.</summary>
     public double BatteryRetrofitExtra { get; set; } = 800;
 
-    /// <summary>Price of a remote solar park share, EUR/kW.</summary>
-    public double RemoteParkCostPerKw { get; set; } = 750;
-
-    /// <summary>Yield multiplier for vertical / shaded balcony panels.</summary>
-    public double BalconyYieldFactor { get; set; } = 0.65;
-
     /// <summary>kWh per kWp per year (Vilnius, south roof).</summary>
     public double Yield { get; set; } = 950;
 
-    public double SubsidyPct { get; set; }
+    /// <summary>APVA compensation for a new solar plant, EUR per kW (DEMO).</summary>
+    public double ApvaPvPerKw { get; set; } = 255;
+
+    /// <summary>Largest plant size APVA compensates, kW.</summary>
+    public double ApvaPvMaxKw { get; set; } = 10;
+
+    /// <summary>APVA compensation for a home battery, EUR per kWh (DEMO).</summary>
+    public double ApvaBatteryPerKwh { get; set; } = 150;
+
+    /// <summary>Largest battery compensation, EUR (DEMO).</summary>
+    public double ApvaBatteryMaxEur { get; set; } = 1500;
 
     public double Discount { get; set; } = 0.04;
 
@@ -54,8 +47,6 @@ public sealed class SolarOptions
     public double PvDegradation { get; set; } = 0.005;
 
     public double BatteryEff { get; set; } = 0.90;
-
-    public double Dod { get; set; } = 0.90;
 
     public double CRate { get; set; } = 0.5;
 
@@ -74,9 +65,4 @@ public sealed class SolarOptions
 
     public double[] HouseBatteryOptions { get; set; } = { 0, 5, 10, 15 };
 
-    public double[] FlatKwpOptions { get; set; } = { 0.4, 0.8 };
-
-    public double[] FlatBatteryOptions { get; set; } = { 0, 2 };
-
-    public double[] RemoteParkKwOptions { get; set; } = { 1, 2, 3, 5 };
 }

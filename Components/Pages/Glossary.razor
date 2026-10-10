@@ -1,0 +1,56 @@
+@page "/zodynelis"
+
+<PageTitle>Žodynėlis · Elektros planas</PageTitle>
+
+<div class="page-head">
+    <div class="eyebrow">Žodynėlis</div>
+    <h1>Ką reiškia sąskaitos žodžiai</h1>
+    <p>Trumpi paaiškinimai sąvokų, kurias matote rezultatuose ir asistento atsakymuose.</p>
+</div>
+
+<section class="panel">
+    <dl class="glossary">
+        @foreach (var (term, meaning) in Terms)
+        {
+            <div class="term">
+                <dt>@term</dt>
+                <dd>@meaning</dd>
+            </div>
+        }
+    </dl>
+</section>
+
+<section class="panel mt-3">
+    <h2 class="h6">Kaip skaičiuojama galutinė kaina</h2>
+    <p class="mb-2"><strong>Galutinė kaina = ESO dalis + tiekėjo dalis ± saulės elektrinė ± kaupiklis.</strong></p>
+    <ul class="mb-0">
+        <li><strong>ESO dalis</strong> – už elektros pristatymą laidais: kWh × ESO tarifas pagal laiko zoną + ESO plano pastovus mokestis. Vienoda, kad ir kurį tiekėją pasirinktumėte.</li>
+        <li><strong>Tiekėjo dalis</strong> – pati energija: fiksuota kaina pagal zoną arba (biržos kaina + marža) × 1,21, plius tiekėjo mėnesio mokestis.</li>
+        <li><strong>VIAP ir DED</strong> – nedideli mokesčiai už kiekvieną kWh (VIAP šiuo metu net neigiamas).</li>
+        <li><strong>Saulės elektrinė</strong> – atiduota į tinklą energija sumažina sąskaitą: dvipusėje apskaitoje kWh kaupiami „banke“, grynajame atsiskaityme – pinigai „piniginėje“.</li>
+        <li><strong>Kaupiklis</strong> – keičia, kada ir kiek elektros perkate iš tinklo.</li>
+    </ul>
+</section>
+
+@code {
+    private static readonly (string Term, string Meaning)[] Terms =
+    {
+        ("kWh", "Energijos kiekis. 1 kW galios prietaisas per valandą suvartoja 1 kWh."),
+        ("kW", "Galia: kiek elektros naudojama vienu metu."),
+        ("Leistinoji galia (LG)", "Didžiausia galia, kurią galima imti iš tinklo. Butams dažniausiai ~5 kW, namams 9–16 kW."),
+        ("Leistinoji generuoti galia (LGG)", "Kiek kW elektrinė ar baterija gali atiduoti į tinklą."),
+        ("Laiko zona", "Paros dalis, kuriai taikomas atskiras tarifas."),
+        ("Išmanusis skaitiklis", "Registruoja vartojimą trumpais intervalais ir pats perduoda duomenis ESO."),
+        ("Nord Pool", "Elektros birža. Lietuva yra atskira kainų zona; kaina nustatoma dieną į priekį kiekvienam 15 min intervalui."),
+        ("Marža", "Tiekėjo antkainis prie biržos kainos."),
+        ("VIAP", "Viešuosius interesus atitinkančios paslaugos: mokestis valstybės energetikos projektams finansuoti."),
+        ("VERT", "Valstybinė energetikos reguliavimo taryba. Tvirtina ESO tarifus ir VIAP."),
+        ("PVM", "Pridėtinės vertės mokestis, elektrai 21 %."),
+        ("Importas (A+)", "Iš tinklo paimta elektra."),
+        ("Eksportas (A−)", "Į tinklą atiduota elektra."),
+        ("Kaupimo laikotarpis", "Dvejų metų laikotarpis, per kurį gaminantis vartotojas gali panaudoti sukauptas kWh ar pinigus."),
+        ("SoC", "Baterijos įkrovos lygis, kWh."),
+        ("η", "Baterijos naudingumo koeficientas: kiek energijos lieka po įkrovimo ir iškrovimo."),
+        ("Asmeninė svertinė kaina", "Vidutinė kWh kaina konkrečiam žmogui, apskaičiuota pagal tai, kada jis vartoja.")
+    };
+}

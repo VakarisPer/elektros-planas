@@ -1,0 +1,26 @@
+@inject QuestionnaireState State
+
+@* Hints of a question whose conditions hold (e.g. "a smart meter is needed") and, when the question asks
+   for it, the ESO grid connection check – a successful check answers the question automatically. *@
+@foreach (var note in State.NotesFor(Question))
+{
+    <div class="notice q-note">
+        ℹ️ @note.Text
+        @if (note.Url is { } url)
+        {
+            <a href="@url" target="_blank" rel="noopener">@(note.LinkText ?? "Daugiau")</a>
+        }
+    </div>
+}
+
+@if (Question.ShowEsoCheck)
+{
+    <EsoConnectionCard OnChecked="OnEsoChecked" />
+}
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = default!;
+
+    /// <summary>Raised after an ESO check (the question may now be answered automatically).</summary>
+    [Parameter] public EventCallback OnEsoChecked { get; set; }
+}

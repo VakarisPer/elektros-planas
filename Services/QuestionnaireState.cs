@@ -13,7 +13,7 @@ namespace vamos.Services;
 /// </summary>
 public sealed class QuestionnaireState
 {
-    private const string StorageKey = "elektros-planai.survey.v4";
+    private const string StorageKey = "elektros-planai.survey.v7";
 
     private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
 
@@ -45,6 +45,45 @@ public sealed class QuestionnaireState
 
     /// <summary>Question currently waiting for the user's answer in the assistant.</summary>
     public int? PendingQuestionId { get; set; }
+
+    /// <summary>Last ESO grid connection check (object number, installed / permitted kW).</summary>
+    public EsoConnectionInfo? EsoConnection { get; set; }
+
+    /// <summary>
+    /// Stores an ESO check and fills the answers it settles: the connectable power answers the
+    /// capacity question; an installed plant means own solar and its exact size answers the plant-size question.
+    /// </summary>
+    public void ApplyEsoConnection(EsoConnectionInfo info)
+    {
+        EsoConnection = info;
+        if (!info.Success)
+        {
+            return;
+        }
+
+        if (GetAnswer(Questionnaire.CapacityId).SelectedOptions.Count == 0 || GetAnswer(Questionnaire.CapacityId).IsAuto)
+        {
+            SetAutoAnswer(Questionnaire.CapacityId,
+                info.AvailableCapacityKw is < 5 ? Questionnaire.CapacityLow : Questionnaire.CapacityOk);
+        }
+
+        if (info.InstalledGenerationKw is not > 0 || info.InstalledGenerationKw is not { } kw)
+        {
+            return;
+        }
+
+        if (GetAnswer(8).SelectedOptions.Count == 0 || GetAnswer(8).IsAuto)
+        {
+            SetAutoAnswer(8, Questionnaire.OwnSolar);
+        }
+
+        SetAutoAnswer(26, kw switch
+        {
+            < 5 => "Iki 5 kW",
+            <= 10 => "5–10 kW",
+            _ => "Virš 10 kW"
+        });
+    }
 
     // ── Answer access ───────────────────────────────────────────────────
 
@@ -123,6 +162,10 @@ public sealed class QuestionnaireState
     // ── Tree walking ────────────────────────────────────────────────────
 
     public bool IsVisible(Question question) => question.ShowWhen.All(ConditionHolds);
+
+    /// <summary>Notes of a question whose conditions currently hold.</summary>
+    public IReadOnlyList<QuestionNote> NotesFor(Question question) =>
+        question.Notes.Where(n => n.ShowWhen.All(ConditionHolds)).ToList();
 
     private bool ConditionHolds(ShowCondition condition)
     {
@@ -258,6 +301,7 @@ public sealed class QuestionnaireState
                 ChatLog = snapshot.ChatLog;
                 AskedQuestionIds = snapshot.AskedQuestionIds;
                 PendingQuestionId = snapshot.PendingQuestionId;
+                EsoConnection = snapshot.EsoConnection;
             }
         }
         catch (JSException) { }
@@ -275,7 +319,8 @@ public sealed class QuestionnaireState
             Recommendation = Recommendation,
             ChatLog = ChatLog,
             AskedQuestionIds = AskedQuestionIds,
-            PendingQuestionId = PendingQuestionId
+            PendingQuestionId = PendingQuestionId,
+            EsoConnection = EsoConnection
         };
 
         try
@@ -296,6 +341,7 @@ public sealed class QuestionnaireState
         ChatLog = new();
         AskedQuestionIds = new();
         PendingQuestionId = null;
+        EsoConnection = null;
 
         try
         {
@@ -341,7 +387,7 @@ public sealed class QuestionnaireState
         if (Recommendation is { } r)
         {
             sb.AppendLine();
-            sb.AppendLine($"Rekomendacija: {Recommendation.PlanTypeLabel(r.PlanType)} ({r.Supplier}), pasitikėjimas: {r.Confidence}");
+            sb.AppendLine($"Rekomendacija: {r.PlanLabel ?? Recommendation.PlanTypeLabel(r.PlanType) + " (" + r.Supplier + ")"}, pasitikėjimas: {r.Confidence}");
             sb.AppendLine(r.SummaryMarkdown);
         }
 

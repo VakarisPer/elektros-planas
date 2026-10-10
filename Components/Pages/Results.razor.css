@@ -253,3 +253,106 @@ hr {
     .month-label { font-size: .62rem; }
     .batt-table { font-size: .8rem; }
 }
+
+.kpi-note {
+    color: var(--muted);
+    font-size: .75rem;
+    margin-top: .15rem;
+}
+
+.why {
+    margin-top: 1.25rem;
+}
+
+.why-list {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+    .why-list li {
+        margin-bottom: .35rem;
+    }
+
+.plans-table tr.is-best td {
+    background: var(--brand-soft);
+}
+
+.offer {
+    margin-bottom: 1.5rem;
+    border: 1.5px solid var(--brand);
+}
+
+.offer-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.offer-plan {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    margin-top: .25rem;
+}
+
+.offer-eso {
+    color: var(--muted);
+}
+
+.offer-price {
+    text-align: right;
+}
+
+.offer-big {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -.03em;
+}
+
+    .offer-big span {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--muted);
+    }
+
+.offer-save {
+    font-weight: 700;
+}
+
+    .offer-save.pos { color: var(--ok); }
+    .offer-save.neg { color: var(--danger); }
+
+.reasons {
+    margin: 1rem 0 .75rem;
+    padding-left: 1.1rem;
+}
+
+    .reasons li {
+        margin-bottom: .4rem;
+    }
+
+.expert {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px dashed var(--line);
+}
+
+.expert-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+    .expert-title span {
+        font-size: .85rem;
+        font-weight: 500;
+        color: var(--muted);
+        margin-left: .4rem;
+    }
+
+@media (max-width: 640px) {
+    .offer-price {
+        text-align: left;
+    }
+}

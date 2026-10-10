@@ -51,6 +51,17 @@ public sealed class ConsumptionAnalyzer
             return Fail(fileName, "Nerasta duomenų eilučių.");
         }
 
+        // ESO exports carry the object number – keep only that, never names or personal codes.
+        string? objectNumber = null;
+        var objectColumn = header is null ? -1 : Array.FindIndex(header, h => h.StartsWith("Objekto nr", StringComparison.OrdinalIgnoreCase));
+        if (objectColumn >= 0)
+        {
+            objectNumber = dataRows
+                .Where(r => r.Length > objectColumn)
+                .Select(r => r[objectColumn])
+                .FirstOrDefault(v => EsoConnectionService.IsValidObjectNumber(v));
+        }
+
         // ESO exports mix energy types: P+ = bought from the grid, P- = given back to the grid
         // (solar), Q+/Q- = reactive energy. Only P+ is consumption; P- is kept as export.
         List<string[]> exportRows = new();
@@ -65,6 +76,12 @@ public sealed class ConsumptionAnalyzer
         var dateColumn = FindDateColumn(dataRows, columnCount);
         var valueColumn = FindValueColumn(dataRows, columnCount, dateColumn, header);
         var timeColumn = FindTimeColumn(dataRows, columnCount, dateColumn, valueColumn);
+
+        // Consumers without a plant still get P- rows, all zero: that is not a prosumer.
+        if (valueColumn >= 0 && SumValues(exportRows, valueColumn) <= 1)
+        {
+            exportRows = new List<string[]>();
+        }
 
         if (valueColumn < 0)
         {
@@ -166,7 +183,7 @@ public sealed class ConsumptionAnalyzer
             peakLabel = buckets.OrderByDescending(kv => kv.Value).First().Key;
         }
 
-        // 12×24 hourly profile for the solar simulation (small enough for localStorage).
+        // Month × day type × hour profile (small enough for localStorage, enough for the tariff zones).
         double[]? importMatrix = null, exportMatrix = null;
         if (isHourly)
         {
@@ -197,37 +214,59 @@ public sealed class ConsumptionAnalyzer
             PeakPeriodLabel = peakLabel,
             // Same period as P+, so the same months divisor applies.
             ExportedMonthlyKwh = exportRows.Count == 0 ? null : SumValues(exportRows, valueColumn) * monthlyAverage / total,
+            ObjectNumber = objectNumber,
             ImportMatrix = importMatrix,
             ExportMatrix = exportMatrix
         };
     }
 
     /// <summary>
-    /// Average kWh per hour for every (month × 24 + hour) cell over the covered period.
-    /// Months missing from the file are copied from the nearest covered month with a seasonal correction.
+    /// Average kWh per hour for every <see cref="TariffCalendar.Cell576(DateTime)"/> cell
+    /// (month × {workday, weekend/holiday} × hour) over the covered period.
+    /// A missing day type is copied from the other one of the same month; months missing from the
+    /// file are copied from the nearest covered month with a seasonal correction.
     /// </summary>
     private static double[] BuildMatrix(IEnumerable<(DateTime When, double Value)> readings, DateTime first, DateTime last, bool isExport)
     {
-        var sum = new double[288];
-        var hours = new int[288];
+        const int cells = 576;
+        var sum = new double[cells];
+        var hours = new int[cells];
         for (var t = first; t <= last; t = t.AddHours(1))
         {
-            hours[(t.Month - 1) * 24 + t.Hour]++;
+            hours[TariffCalendar.Cell576(t)]++;
         }
 
         foreach (var (when, value) in readings)
         {
-            sum[(when.Month - 1) * 24 + when.Hour] += value;
+            sum[TariffCalendar.Cell576(when)] += value;
         }
 
-        var matrix = new double[288];
-        var covered = new bool[12];
-        for (var c = 0; c < 288; c++)
+        var matrix = new double[cells];
+        var has = new bool[cells];
+        for (var c = 0; c < cells; c++)
         {
             if (hours[c] > 0)
             {
                 matrix[c] = sum[c] / hours[c];
-                covered[c / 24] = true;
+                has[c] = true;
+            }
+        }
+
+        bool DayTypeCovered(int month, int free) => Enumerable.Range(0, 24).Any(h => has[(month * 2 + free) * 24 + h]);
+
+        var covered = new bool[12];
+        for (var m = 0; m < 12; m++)
+        {
+            var work = DayTypeCovered(m, 0);
+            var free = DayTypeCovered(m, 1);
+            covered[m] = work || free;
+            if (work != free)
+            {
+                var from = work ? 0 : 1;
+                for (var h = 0; h < 24; h++)
+                {
+                    matrix[(m * 2 + 1 - from) * 24 + h] = matrix[(m * 2 + from) * 24 + h];
+                }
             }
         }
 
@@ -253,14 +292,17 @@ public sealed class ConsumptionAnalyzer
                 .SelectMany(d => new[] { (m + d) % 12, (m - d + 12) % 12 })
                 .First(x => covered[x]);
 
-            for (var h = 0; h < 24; h++)
+            for (var f = 0; f < 2; f++)
             {
-                var from = Season(source, h);
-                matrix[m * 24 + h] = from > 1e-9 ? matrix[source * 24 + h] * Season(m, h) / from : 0;
+                for (var h = 0; h < 24; h++)
+                {
+                    var from = Season(source, h);
+                    matrix[(m * 2 + f) * 24 + h] = from > 1e-9 ? matrix[(source * 2 + f) * 24 + h] * Season(m, h) / from : 0;
+                }
             }
         }
 
-        for (var c = 0; c < 288; c++)
+        for (var c = 0; c < cells; c++)
         {
             matrix[c] = Math.Round(matrix[c], 3);
         }
@@ -494,21 +536,22 @@ public sealed class ConsumptionAnalyzer
     private static double SumValues(List<string[]> rows, int column) =>
         rows.Where(r => r.Length > column).Sum(r => ParseNumber(r[column]) is { } v and > 0 ? v : 0);
 
+    /// <summary>
+    /// Time of day like "7:00" or "07:00:00". Plain numbers are rejected: <see cref="TimeSpan.TryParse(string, IFormatProvider, out TimeSpan)"/>
+    /// would read "22" (permitted power) or "10000001" (customer code) as days.
+    /// </summary>
     private static TimeSpan? ParseTime(string raw)
     {
         var s = raw.Trim();
-        if (s.Length == 0)
+        if (s.Length == 0 || !s.Contains(':'))
         {
             return null;
         }
 
         string[] formats = { @"h\:mm", @"hh\:mm", @"h\:mm\:ss", @"hh\:mm\:ss" };
-        if (TimeSpan.TryParseExact(s, formats, CultureInfo.InvariantCulture, out var exact))
-        {
-            return exact;
-        }
-
-        return TimeSpan.TryParse(s, CultureInfo.InvariantCulture, out var loose) ? loose : null;
+        return TimeSpan.TryParseExact(s, formats, CultureInfo.InvariantCulture, out var time) && time < TimeSpan.FromDays(1)
+            ? time
+            : null;
     }
 
     private static DateTime? ParseDate(string raw)

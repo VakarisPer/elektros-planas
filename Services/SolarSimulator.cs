@@ -1,27 +1,34 @@
 namespace vamos.Services;
 
-/// <summary>Physical parameters of one simulation run.</summary>
-public sealed record SimOptions(double YieldPerKwp, double Eff, double Dod, double CRate)
+/// <summary>
+/// Physical parameters of one simulation run. <paramref name="Eff"/> is the battery efficiency η
+/// (applied when charging), <paramref name="CRate"/> sets the battery power: galia = talpa × CRate.
+/// </summary>
+public sealed record SimOptions(double YieldPerKwp, double Eff, double CRate)
 {
-    /// <summary>
-    /// Simple price arbitrage for exchange / two-zone plans: in months without solar surplus the
-    /// battery is charged from the grid at night (0–6) up to the expected evening (17–22) deficit.
-    /// </summary>
-    public bool GridChargeAtNight { get; init; }
-
-    /// <summary>Remote park share: nothing is self-consumed, all generation goes to the grid.</summary>
-    public bool RemoteOnly { get; init; }
+    /// <summary>Grid export cap set by ESO (e.g. 1 kW); surplus above it is curtailed and lost.</summary>
+    public double? ExportLimitKw { get; init; }
 }
 
-/// <summary>Yearly energy flows of one configuration; matrices are kWh per (month × 24 + hour) cell.</summary>
+/// <summary>Yearly energy flows of one configuration, with the hourly import / export series.</summary>
 public sealed class SimResult
 {
     public double Load { get; init; }
     public double Import { get; init; }
     public double Export { get; init; }
     public double Generation { get; init; }
-    public double[] Import288 { get; init; } = new double[288];
-    public double[] Export288 { get; init; } = new double[288];
+
+    /// <summary>Plant size of this run, kWp.</summary>
+    public double PvKwp { get; init; }
+
+    /// <summary>Battery size of this run, kWh.</summary>
+    public double BattKwh { get; init; }
+
+    /// <summary>kWh bought from the grid in every hour of <see cref="TariffCalendar"/>.</summary>
+    public double[] ImportSeries { get; init; } = new double[SolarSimulator.Hours];
+
+    /// <summary>kWh given to the grid in every hour.</summary>
+    public double[] ExportSeries { get; init; } = new double[SolarSimulator.Hours];
 
     public double SelfConsumptionPct => Generation > 0 ? 100 * (Generation - Export) / Generation : 0;
     public double SelfSufficiencyPct => Load > 0 ? 100 * (1 - Import / Load) : 0;
@@ -32,6 +39,14 @@ public sealed class SolarOption
 {
     public double PvKwp { get; init; }
     public double BattKwh { get; init; }
+
+    /// <summary>Approximate equipment price before APVA, EUR.</summary>
+    public double GrossCapex { get; init; }
+
+    /// <summary>APVA compensation, EUR.</summary>
+    public double Subsidy { get; init; }
+
+    /// <summary>Final investment after APVA, EUR.</summary>
     public double Capex { get; init; }
     public double Year1Savings { get; init; }
     public double BatteryExtraYear1 { get; init; }
@@ -54,10 +69,11 @@ public sealed class SolarScan
 }
 
 /// <summary>
-/// C# port of <c>tools/solar_calc.py</c>: hourly PV generation for Vilnius, battery dispatch and
-/// NPV / payback. Kept as close to the Python as possible so results can be checked for parity
-/// (see tools/parity); the only extensions are a pluggable cost function, an existing-plant mode,
-/// night grid charging and remote park shares.
+/// Hourly PV generation for Vilnius and NPV / payback ported from <c>tools/solar_calc.py</c>
+/// (PV-only results are checked for parity, see tools/parity). The battery follows the project
+/// documentation instead: <c>k = min(p, galia·Δt, (talpa − SoC)/η)</c>, <c>SoC += k·η</c> when
+/// charging from surplus, <c>d = min(−p, galia·Δt, SoC)</c> when covering a deficit. The battery
+/// never discharges into the grid.
 /// </summary>
 public static class SolarSimulator
 {
@@ -136,82 +152,45 @@ public static class SolarSimulator
 
     public static SimResult Simulate(double[] load, double pvKwp, double battKwh, SimOptions o)
     {
-        var eta = Math.Sqrt(o.Eff);
-        var usable = battKwh * o.Dod;
-        var pmax = battKwh * o.CRate;
+        var eta = o.Eff;
+        var power = battKwh * o.CRate; // kW, Δt = 1 h
         var soc = 0.0;
         double imp = 0, exp = 0, gen = 0;
-        var import288 = new double[288];
-        var export288 = new double[288];
-
-        // Expected evening (17–22) deficit per day, used by the night grid-charging rule.
-        double[]? eveningNeed = null;
-        if (o.GridChargeAtNight && battKwh > 0)
-        {
-            eveningNeed = new double[365];
-            for (var i = 0; i < Hours; i++)
-            {
-                var hod = i % 24;
-                if (hod is >= 17 and < 22)
-                {
-                    eveningNeed[i / 24] += Math.Max(0, load[i] - GenShape[i] * o.YieldPerKwp * pvKwp);
-                }
-            }
-        }
+        var importSeries = new double[Hours];
+        var exportSeries = new double[Hours];
 
         for (var i = 0; i < Hours; i++)
         {
-            var hod = i % 24;
-            var cell = MonthOf[i] * 24 + hod;
             var l = load[i];
             var g = GenShape[i] * o.YieldPerKwp * pvKwp;
             gen += g;
 
-            double direct, surplus, deficit;
-            if (o.RemoteOnly)
+            var p = g - l;
+            var surplus = Math.Max(0, p);
+            var deficit = Math.Max(0, -p);
+
+            if (battKwh > 0 && p > 0)
             {
-                direct = 0;
-                surplus = g;
-                deficit = l;
+                var k = Math.Min(Math.Min(p, power), (battKwh - soc) / eta);
+                soc += k * eta;
+                surplus = p - k;
             }
-            else
+            else if (battKwh > 0 && p < 0)
             {
-                direct = Math.Min(l, g);
-                surplus = g - direct;
-                deficit = l - direct;
-            }
-
-            var gridCharge = 0.0;
-            if (battKwh > 0 && !o.RemoteOnly)
-            {
-                var ch = Math.Min(Math.Min(surplus, (usable - soc) / eta), pmax);
-                if (ch > 0)
-                {
-                    soc += ch * eta;
-                    surplus -= ch;
-                }
-
-                // Winter nights: fill the battery from the grid for the expensive evening.
-                if (eveningNeed is not null && hod < 6 && IsLowSunMonth(MonthOf[i]))
-                {
-                    var target = Math.Min(usable, eveningNeed[i / 24] / eta);
-                    gridCharge = Math.Max(0, Math.Min(Math.Min((target - soc) / eta, (usable - soc) / eta), pmax));
-                    soc += gridCharge * eta;
-                }
-
-                var dis = Math.Min(Math.Min(deficit, soc * eta), pmax);
-                if (dis > 0)
-                {
-                    soc -= dis / eta;
-                    deficit -= dis;
-                }
+                var d = Math.Min(Math.Min(-p, power), soc);
+                soc -= d;
+                deficit = -p - d;
             }
 
-            var hourImport = deficit + gridCharge;
-            imp += hourImport;
+            if (o.ExportLimitKw is { } limit && surplus > limit)
+            {
+                surplus = limit;
+            }
+
+            imp += deficit;
             exp += surplus;
-            import288[cell] += hourImport;
-            export288[cell] += surplus;
+            importSeries[i] = deficit;
+            exportSeries[i] = surplus;
         }
 
         return new SimResult
@@ -220,12 +199,12 @@ public static class SolarSimulator
             Import = imp,
             Export = exp,
             Generation = gen,
-            Import288 = import288,
-            Export288 = export288
+            PvKwp = pvKwp,
+            BattKwh = battKwh,
+            ImportSeries = importSeries,
+            ExportSeries = exportSeries
         };
     }
-
-    private static bool IsLowSunMonth(int month) => month is <= 1 or >= 9;
 
     /// <summary>
     /// Scans every configuration and evaluates it like solar_calc.py. <paramref name="annualCost"/>
@@ -289,46 +268,17 @@ public static class SolarSimulator
 
             var capex = newPv * pvCostPerKwp + batt * p.BatteryCostPerKwh
                         + (existingKwp > 0 && batt > 0 ? p.BatteryRetrofitExtra : 0);
-            var capexNet = capex * (1 - p.SubsidyPct / 100);
-
-            var cash = new List<double> { -capexNet };
-            for (var y = 1; y <= p.Horizon; y++)
-            {
-                var pf = Math.Pow(1 + p.PriceGrowth, y - 1);
-                var s = savPv * Math.Pow(1 - p.PvDegradation, y - 1) * pf;
-                if (batt > 0 && y <= p.BatteryLife)
-                {
-                    s += battExtra * pf * Math.Pow(1 - p.BatteryFade, y - 1);
-                }
-
-                if (y == p.InverterYear && newPv > 0 && !sim.RemoteOnly)
-                {
-                    s -= newPv * p.InverterCost;
-                }
-
-                cash.Add(s);
-            }
-
-            var npv = cash.Select((c, t) => c / Math.Pow(1 + p.Discount, t)).Sum();
-
-            double? payback = null;
-            double cum = 0;
-            for (var t = 0; t < cash.Count; t++)
-            {
-                var prev = cum;
-                cum += cash[t];
-                if (t > 0 && cum >= 0 && prev < 0)
-                {
-                    payback = (t - 1) + (-prev / cash[t]);
-                    break;
-                }
-            }
+            var subsidy = Apva(newPv, batt, p);
+            var capexNet = capex - subsidy;
+            var (npv, payback) = Cashflow(capexNet, savPv, battExtra, batt, newPv, p);
 
             var r = Run(pv, batt);
             return new SolarOption
             {
                 PvKwp = pv,
                 BattKwh = batt,
+                GrossCapex = Math.Round(capex),
+                Subsidy = Math.Round(subsidy),
                 Capex = Math.Round(capexNet),
                 Year1Savings = Math.Round(Savings(pv, batt)),
                 BatteryExtraYear1 = Math.Round(battExtra),
@@ -339,5 +289,52 @@ public static class SolarSimulator
                 SelfSufficiencyPct = Math.Round(r.SelfSufficiencyPct)
             };
         }
+    }
+
+    /// <summary>APVA compensation (DEMO rates): per kW of new PV up to a cap, per kWh of battery.</summary>
+    public static double Apva(double newPvKwp, double battKwh, SolarOptions p) =>
+        Math.Min(newPvKwp, p.ApvaPvMaxKw) * p.ApvaPvPerKw + Math.Min(battKwh * p.ApvaBatteryPerKwh, p.ApvaBatteryMaxEur);
+
+    /// <summary>
+    /// NPV and payback of an investment (solar_calc.py <c>evaluate</c>): yearly savings grow with
+    /// prices, PV degrades, the battery part fades and ends after its life, the inverter is replaced once.
+    /// </summary>
+    public static (double Npv, double? Payback) Cashflow(double capexNet, double savPv, double battExtra, double batt,
+        double newPv, SolarOptions p)
+    {
+        var cash = new List<double> { -capexNet };
+        for (var y = 1; y <= p.Horizon; y++)
+        {
+            var pf = Math.Pow(1 + p.PriceGrowth, y - 1);
+            var s = savPv * Math.Pow(1 - p.PvDegradation, y - 1) * pf;
+            if (batt > 0 && y <= p.BatteryLife)
+            {
+                s += battExtra * pf * Math.Pow(1 - p.BatteryFade, y - 1);
+            }
+
+            if (y == p.InverterYear && newPv > 0)
+            {
+                s -= newPv * p.InverterCost;
+            }
+
+            cash.Add(s);
+        }
+
+        var npv = cash.Select((c, t) => c / Math.Pow(1 + p.Discount, t)).Sum();
+
+        double? payback = null;
+        double cum = 0;
+        for (var t = 0; t < cash.Count; t++)
+        {
+            var prev = cum;
+            cum += cash[t];
+            if (t > 0 && cum >= 0 && prev < 0)
+            {
+                payback = (t - 1) + (-prev / cash[t]);
+                break;
+            }
+        }
+
+        return (npv, payback);
     }
 }

@@ -1,0 +1,24 @@
+{
+  "_comment": "DEMO tiekėjų planai (ne tikros kainos!). kainos – EUR/kWh, marza – EUR/kWh be PVM (birža: (np + marza) × 1,21). su_pvm=false → kainos dauginamos iš 1,21. iskaicia_eso=true → ESO dalis nepridedama. Atnaujinkite pagal tiekėjų svetaines ir Energetikos agentūros suvestines.",
+  "Plans": [
+    { "tiekejas": "Elektrum", "pavadinimas": "Elektrum fiksuota 12 mėn.", "tipas": "fiksuota", "trukme_men": 12, "zonos": 1, "kainos": { "Visa para": 0.159 }, "men_mokestis": 2.49, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Elektrum", "pavadinimas": "Elektrum fiksuota 12 mėn., 2 zonos", "tipas": "fiksuota", "trukme_men": 12, "zonos": 2, "kainos": { "Diena": 0.176, "Naktis": 0.128 }, "men_mokestis": 2.49, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Elektrum", "pavadinimas": "Elektrum fiksuota 12 mėn., 4 zonos", "tipas": "fiksuota", "trukme_men": 12, "zonos": 4, "kainos": { "Naktis": 0.122, "Rytas": 0.152, "Diena": 0.163, "Vakaras": 0.192 }, "men_mokestis": 2.49, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Elektrum", "pavadinimas": "Elektrum fiksuota 24 mėn.", "tipas": "fiksuota", "trukme_men": 24, "zonos": 1, "kainos": { "Visa para": 0.165 }, "men_mokestis": 2.49, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Elektrum", "pavadinimas": "Elektrum fiksuota 24 mėn., 2 zonos", "tipas": "fiksuota", "trukme_men": 24, "zonos": 2, "kainos": { "Diena": 0.182, "Naktis": 0.133 }, "men_mokestis": 2.49, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Elektrum", "pavadinimas": "Elektrum birža", "tipas": "birza", "trukme_men": 12, "marza": 0.012, "men_mokestis": 2.49, "su_pvm": false, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+
+    { "tiekejas": "Ignitis", "pavadinimas": "Ignitis fiksuota 12 mėn.", "tipas": "fiksuota", "trukme_men": 12, "zonos": 1, "kainos": { "Visa para": 0.164 }, "men_mokestis": 2.99, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Ignitis", "pavadinimas": "Ignitis fiksuota 12 mėn., 2 zonos", "tipas": "fiksuota", "trukme_men": 12, "zonos": 2, "kainos": { "Diena": 0.181, "Naktis": 0.121 }, "men_mokestis": 2.99, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Ignitis", "pavadinimas": "Ignitis fiksuota 24 mėn.", "tipas": "fiksuota", "trukme_men": 24, "zonos": 1, "kainos": { "Visa para": 0.169 }, "men_mokestis": 2.99, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Ignitis", "pavadinimas": "Ignitis birža", "tipas": "birza", "trukme_men": 12, "marza": 0.010, "men_mokestis": 2.99, "su_pvm": false, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Ignitis", "pavadinimas": "Ignitis visuomeninis tiekimas", "tipas": "visuomeninis", "trukme_men": 1, "zonos": 1, "kainos": { "Visa para": 0.178 }, "men_mokestis": 0, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-07-01" },
+    { "tiekejas": "Ignitis", "pavadinimas": "Ignitis visuomeninis tiekimas, 2 zonos", "tipas": "visuomeninis", "trukme_men": 1, "zonos": 2, "kainos": { "Diena": 0.194, "Naktis": 0.135 }, "men_mokestis": 0, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-07-01" },
+
+    { "tiekejas": "Enefit", "pavadinimas": "Enefit fiksuota 12 mėn.", "tipas": "fiksuota", "trukme_men": 12, "zonos": 1, "kainos": { "Visa para": 0.157 }, "men_mokestis": 1.99, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Enefit", "pavadinimas": "Enefit fiksuota 12 mėn., 2 zonos", "tipas": "fiksuota", "trukme_men": 12, "zonos": 2, "kainos": { "Diena": 0.173, "Naktis": 0.131 }, "men_mokestis": 1.99, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Enefit", "pavadinimas": "Enefit fiksuota 12 mėn., 4 zonos", "tipas": "fiksuota", "trukme_men": 12, "zonos": 4, "kainos": { "Naktis": 0.119, "Rytas": 0.149, "Diena": 0.161, "Vakaras": 0.189 }, "men_mokestis": 1.99, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Enefit", "pavadinimas": "Enefit fiksuota 24 mėn.", "tipas": "fiksuota", "trukme_men": 24, "zonos": 1, "kainos": { "Visa para": 0.162 }, "men_mokestis": 1.99, "su_pvm": true, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" },
+    { "tiekejas": "Enefit", "pavadinimas": "Enefit birža", "tipas": "birza", "trukme_men": 12, "marza": 0.013, "men_mokestis": 1.99, "su_pvm": false, "iskaicia_eso": false, "galioja_nuo": "2026-08-01" }
+  ]
+}

@@ -20,4 +20,6 @@ public sealed class SurveySnapshot
     public List<int> AskedQuestionIds { get; set; } = new();
 
     public int? PendingQuestionId { get; set; }
+
+    public EsoConnectionInfo? EsoConnection { get; set; }
 }

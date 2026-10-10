@@ -3,15 +3,16 @@
 @using System.Globalization
 @inject QuestionnaireState State
 @inject ConsumptionAnalyzer Analyzer
+@inject EsoConnectionService Eso
 
 <PageTitle>Duomenys · Elektros planas</PageTitle>
 
 <div class="page-head">
-    <div class="eyebrow">Neprivaloma, bet labai padeda</div>
+    <div class="eyebrow">1 žingsnis · neprivaloma, bet labai padeda</div>
     <h1>Įkelkite elektros suvartojimo duomenis</h1>
     <p>
-        Atsisiųskite valandinius duomenis iš <strong>mano.eso.lt</strong> (CSV) ir įkelkite čia. Apskaičiuosime vidutinį
-        suvartojimą ir naktinio vartojimo dalį – asistentui nebereikės to klausti.
+        Atsisiųskite valandinius duomenis iš <strong>mano.eso.lt</strong> (CSV) ir įkelkite čia. Apskaičiuosime suvartojimą
+        kiekvieną valandą, o pagal objekto numerį patys patikrinsime ESO prijungimo galimybes (galimą apkrovą).
     </p>
 </div>
 
@@ -52,11 +53,13 @@
     </div>
 }
 
+<EsoConnectionCard ObjectNumber="@State.Analysis?.ObjectNumber" />
+
 <div class="d-flex flex-wrap gap-2 mt-4">
     <a class="btn btn-primary btn-lg" href="assistant">@(_success ? "Tęsti su asistentu →" : "Eiti į asistentą →")</a>
 </div>
 
-<p class="muted small mt-3 mb-0">Failas apdorojamas serveryje tik analizei ir niekur nesiunčiamas.</p>
+<p class="muted small mt-3 mb-0">Failas apdorojamas serveryje tik analizei ir niekur nesiunčiamas; į eso.lt siunčiamas tik objekto numeris.</p>
 
 @code {
     private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
@@ -88,15 +91,16 @@
 
             if (analysis.Success)
             {
-                // The analyzer answers the consumption questions so the user does not have to.
+                // With a file the consumption question is answered automatically.
                 if (analysis.MonthlyAverageKwh is { } average)
                 {
-                    State.SetAutoAnswer(3, MonthlyRangeLabel(average));
-                }
-
-                if (analysis.PeakPeriodLabel is not null)
-                {
-                    State.SetAutoAnswer(15, analysis.PeakPeriodLabel);
+                    State.SetAutoAnswer(3, average switch
+                    {
+                        < 150 => Questionnaire.MonthlyLow,
+                        <= 300 => Questionnaire.MonthlyMid,
+                        <= 600 => Questionnaire.MonthlyHigh,
+                        _ => Questionnaire.MonthlyVeryHigh
+                    });
                 }
 
                 // Energy given back to the grid means an own solar plant.
@@ -111,9 +115,16 @@
                     State.SetAutoAnswer(20, Questionnaire.SmartMeterYes);
                 }
 
+                // The scheme: with an ESO file the program checks the grid capacity itself.
+                if (analysis.ObjectNumber is { } objectNumber)
+                {
+                    State.ApplyEsoConnection(await Eso.CheckAsync(objectNumber));
+                }
+
                 _success = true;
                 _message = $"Nuskaityta {analysis.Readings} įrašų ({analysis.Months} mėn.). " +
-                           "Su vartojimu susiję klausimai užpildyti automatiškai.";
+                           "Suvartojimas ir skaitiklio tipas užpildyti automatiškai" +
+                           (State.EsoConnection is { Success: true } ? ", ESO prijungimo galimybės patikrintos." : ".");
             }
             else
             {
@@ -129,10 +140,4 @@
         }
     }
 
-    private static string MonthlyRangeLabel(double kwh) => kwh switch
-    {
-        < 150 => Questionnaire.MonthlyLow,
-        <= 300 => Questionnaire.MonthlyMid,
-        _ => Questionnaire.MonthlyHigh
-    };
 }

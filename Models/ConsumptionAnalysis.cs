@@ -31,9 +31,15 @@ public sealed class ConsumptionAnalysis
     /// </summary>
     public double? ExportedMonthlyKwh { get; set; }
 
-    /// <summary>Average grid import per hour, kWh, indexed month × 24 + hour (hourly files only).</summary>
+    /// <summary>ESO object number ("Objekto nr.") found in the file; used for the grid connection check.</summary>
+    public string? ObjectNumber { get; set; }
+
+    /// <summary>
+    /// Average grid import per hour, kWh, 576 cells indexed (month × 2 + weekend/holiday) × 24 + hour
+    /// (see <see cref="vamos.Services.TariffCalendar.Cell576(System.DateTime)"/>; hourly files only).
+    /// </summary>
     public double[]? ImportMatrix { get; set; }
 
-    /// <summary>Average export to the grid per hour, kWh, indexed month × 24 + hour (prosumers only).</summary>
+    /// <summary>Average export to the grid per hour, kWh, same 576 cells (prosumers only).</summary>
     public double[]? ExportMatrix { get; set; }
 }

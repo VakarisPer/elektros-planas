@@ -1,0 +1,54 @@
+{
+  "_comment": "ESO tinklo (skirstymo) tarifai buitiniams vartotojams, EUR/kWh su PVM. Tvirtina VERT, keičiasi sausio 1 d. ir liepos 1 d. – saugokite su datomis.",
+  "Periods": [
+    {
+      "ValidFrom": "2026-01-01",
+      "Viap": -0.0005324,
+      "Ded": 0.0002693,
+      "Plans": [
+        {
+          "Id": "Standartinis",
+          "Description": "Pastovaus mokesčio nėra, bet kWh brangiausia.",
+          "FixedMonthly": 0,
+          "FixedPerLgKw": 0,
+          "Zones": {
+            "1": { "Visa para": 0.11132 },
+            "2": { "Diena": 0.12947, "Naktis": 0.07139 },
+            "4": { "Naktis": 0.06292, "Rytas": 0.08349, "Diena": 0.10406, "Vakaras": 0.14641 }
+          }
+        },
+        {
+          "Id": "Efektyvus",
+          "Description": "Mokestis pagal leistinąją galią, bet kWh pigiausia.",
+          "FixedMonthly": 0,
+          "FixedPerLgKw": 1.00,
+          "Zones": {
+            "1": { "Visa para": 0.08833 },
+            "2": { "Diena": 0.10164, "Naktis": 0.05687 },
+            "4": { "Naktis": 0.05082, "Rytas": 0.06534, "Diena": 0.08228, "Vakaras": 0.11374 }
+          }
+        },
+        {
+          "Id": "Namai",
+          "Description": "Fiksuotas mėnesio mokestis, o kWh 0,01573 € pigesnė nei Standartiniame.",
+          "FixedMonthly": 3.00,
+          "FixedPerLgKw": 0,
+          "Zones": {
+            "1": { "Visa para": 0.09559 },
+            "2": { "Diena": 0.11011, "Naktis": 0.06171 }
+          }
+        }
+      ]
+    }
+  ],
+  "Prosumer": {
+    "_comment": "Gaminančių vartotojų atsiskaitymas. Dvipusė apskaita – 4 ESO būdai; grynasis atsiskaitymas – eksportas parduodamas biržos kaina minus administravimo mokestis.",
+    "Mode1PerKwh": 0.0726,
+    "Mode2PerLggKwMonth": 5.0336,
+    "Mode3BankShare": 0.63,
+    "NetBillingFee": 0.0247,
+    "PeriodStart": "2026-04-01",
+    "PeriodEnd": "2028-03-31",
+    "PayoutTaxFrom": 2500
+  }
+}

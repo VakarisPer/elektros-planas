@@ -9,7 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    // The saved survey (hourly profile matrices + chat) is read back from localStorage over SignalR.
+    .AddHubOptions(o => o.MaximumReceiveMessageSize = 512 * 1024);
 
 builder.Services.AddScoped<ProtectedLocalStorage>();
 builder.Services.AddScoped<SubmissionWriter>();
@@ -20,8 +22,24 @@ builder.Services.AddScoped<QuestionnaireState>();
 builder.Services.Configure<OpenRouterOptions>(builder.Configuration.GetSection("OpenRouter"));
 builder.Services.Configure<TariffOptions>(builder.Configuration.GetSection("Tariffs"));
 builder.Services.Configure<SolarOptions>(builder.Configuration.GetSection("Solar"));
+builder.Services.AddSingleton(sp => new TariffCatalog(sp.GetRequiredService<IWebHostEnvironment>().ContentRootPath));
+builder.Services.AddSingleton<BillEngine>();
 builder.Services.AddSingleton<PlanCalculator>();
 builder.Services.AddSingleton<SolarAdvisor>();
+
+// ESO "Saulės elektrinės prijungimo galimybės" lookup (cookies are handled manually per request).
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<EsoConnectionService>(client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(15);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; ElektrosPlanas/1.0; Hack4Vilnius)");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json, text/plain, */*");
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        UseCookies = false,
+        AutomaticDecompression = System.Net.DecompressionMethods.All
+    });
 builder.Services.AddSingleton<AdvisorPrompt>();
 builder.Services.AddScoped<ElectricityAdvisorAgent>();
 

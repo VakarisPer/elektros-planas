@@ -8,6 +8,15 @@
         <p class="muted small mb-0">Galima pasirinkti kelis variantus.</p>
     }
 
+    <QuestionNotes Question="Question" OnEsoChecked="SaveAndNotify" />
+
+    @if (Question.IsFreeText)
+    {
+        <textarea class="form-control mt-3" rows="4" value="@Answer.CustomText" aria-label="Papildoma informacija"
+                  placeholder="Pvz.: kitąmet planuojame šilumos siurblį, dirbu naktinėmis pamainomis…"
+                  @onchange="OnFreeTextChanged"></textarea>
+    }
+
     <div class="option-list mt-3">
         @for (var i = 0; i < Question.Options.Count; i++)
         {
@@ -30,7 +39,7 @@
             </label>
         }
 
-        @if (Question.AllowCustom)
+        @if (Question.AllowCustom && !Question.IsFreeText)
         {
             var customId = $"q-{Question.Id}-custom";
             var customSelected = Answer.SelectedOptions.Contains(Question.CustomOption);
@@ -77,6 +86,23 @@
     private async Task OnMultiOptionChanged(string option, bool isChecked)
     {
         State.ToggleMulti(Question.Id, option, isChecked, Question.ExclusiveOption);
+        await SaveAndNotify();
+    }
+
+    private async Task OnFreeTextChanged(ChangeEventArgs e)
+    {
+        var text = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            State.ClearSelection(Question.Id);
+            State.SetCustomText(Question.Id, null);
+        }
+        else
+        {
+            State.SetSingle(Question.Id, Models.Question.CustomOption);
+            State.SetCustomText(Question.Id, text);
+        }
+
         await SaveAndNotify();
     }
 

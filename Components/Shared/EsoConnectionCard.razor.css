@@ -1,0 +1,51 @@
+.eso-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.25rem;
+    margin-top: 1.25rem;
+}
+
+.eso-head h3 {
+    font-size: 1.1rem;
+    margin: .2rem 0 .35rem;
+}
+
+.eso-form {
+    display: flex;
+    gap: .5rem;
+    margin-top: .9rem;
+}
+
+    .eso-form .form-control {
+        max-width: 260px;
+    }
+
+.eso-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .6rem;
+    margin-top: 1rem;
+}
+
+.kpi {
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: .65rem .85rem;
+}
+
+.kpi-label {
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+.kpi-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+@media (max-width: 520px) {
+    .eso-form { flex-direction: column; }
+    .eso-form .form-control { max-width: none; }
+}

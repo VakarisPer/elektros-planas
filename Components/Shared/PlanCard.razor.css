@@ -106,3 +106,58 @@
     .delta.pos { color: var(--ok); }
     .delta.neg { color: var(--danger); }
 
+
+.plan-eso {
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--brand-strong);
+}
+
+.split {
+    margin-top: .75rem;
+    border-top: 1px solid var(--line);
+    padding-top: .6rem;
+    font-size: .85rem;
+}
+
+    .split summary {
+        cursor: pointer;
+        color: var(--brand-strong);
+        font-weight: 600;
+    }
+
+    .split table {
+        width: 100%;
+        margin-top: .5rem;
+        border-collapse: collapse;
+    }
+
+    .split td {
+        padding: .3rem 0;
+        border-bottom: 1px dashed var(--line);
+        vertical-align: top;
+    }
+
+        .split td:last-child {
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            padding-left: .5rem;
+        }
+
+        .split td small {
+            display: block;
+            color: var(--muted);
+            font-size: .75rem;
+        }
+
+    .split tr.total td {
+        font-weight: 700;
+        border-bottom: none;
+    }
+
+.split-note {
+    margin: .4rem 0 0;
+    color: var(--muted);
+    font-size: .75rem;
+}

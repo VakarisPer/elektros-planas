@@ -1,6 +1,6 @@
 @using System.Globalization
 
-@* Plan cost card: the monthly price is the headline, the yearly one is secondary. *@
+@* Plan cost card: the monthly full bill is the headline; the split (ESO + supplier) folds out. *@
 <article class="plan-card @(IsRec ? "is-rec" : null)">
     @if (IsRec)
     {
@@ -8,6 +8,7 @@
     }
     <div class="plan-type">@Recommendation.PlanTypeLabel(Plan.Type)</div>
     <div class="plan-name">@(Subtitle ?? Plan.PlanName)</div>
+    <div class="plan-eso">@Plan.EsoLabel@(Plan.Settlement is { } s ? $" · {s}" : "")</div>
     <div class="plan-cost">@Eur(Plan.MonthlyCost)<span>/ mėn.</span></div>
     <div class="plan-sub">~@Eur(Plan.YearlyCost) per metus · @Plan.EffectivePrice.ToString("0.000", Lt) €/kWh</div>
 
@@ -34,6 +35,44 @@
             <span class="delta @(diff >= 0 ? "pos" : "neg")">@(diff >= 0 ? "−" : "+")@Eur(Math.Abs(diff))/mėn. vs fiksuotas</span>
         }
     </div>
+
+    @if (Plan.Breakdown is { } b)
+    {
+        <details class="split">
+            <summary>Kaip susidaro kaina</summary>
+            <table>
+                <tbody>
+                    @foreach (var line in b.EsoLines.Where(l => l.Kwh > 0.5))
+                    {
+                        <tr>
+                            <td>@line.Label <small>@Kwh(line.Kwh / 12) × @line.Price.ToString("0.00000", Lt)</small></td>
+                            <td>@Eur2(line.Eur / 12)</td>
+                        </tr>
+                    }
+                    @if (b.EsoFixed > 0)
+                    {
+                        <tr><td>ESO pastovus</td><td>@Eur2(b.EsoFixed / 12)</td></tr>
+                    }
+                    @if (b.ProsumerFee > 0)
+                    {
+                        <tr><td>ESO mokestis už atsiimtą <small>@Kwh(b.TakenBackKwh / 12)</small></td><td>@Eur2(b.ProsumerFee / 12)</td></tr>
+                    }
+                    <tr><td>Energija <small>@Plan.Supplier</small></td><td>@Eur2(b.Energy / 12)</td></tr>
+                    @if (b.SupplierFee > 0)
+                    {
+                        <tr><td>Tiekėjo mėnesio mokestis</td><td>@Eur2(b.SupplierFee / 12)</td></tr>
+                    }
+                    <tr><td>VIAP + DED</td><td>@Eur2(b.ViapDed / 12)</td></tr>
+                    @if (b.WalletUsed < 0)
+                    {
+                        <tr><td>Piniginė (grynasis atsiskaitymas)</td><td>@Eur2(b.WalletUsed / 12)</td></tr>
+                    }
+                    <tr class="total"><td>Iš viso per mėnesį</td><td>@Eur2(b.Total / 12)</td></tr>
+                </tbody>
+            </table>
+            <p class="split-note">Metų vidurkis. Visos sumos su PVM.@(b.BankLeftoverKwh > 0.5 ? $" Banke lieka ~{b.BankLeftoverKwh.ToString("#,0", Lt)} kWh – kaupimo laikotarpio pabaigoje kompensuojama pagal tiekėjo sutartį." : "")</p>
+        </details>
+    }
 </article>
 
 @code {
@@ -54,7 +93,11 @@
     [Parameter] public string CompareLabel { get; set; } = "vs be saulės";
     [Parameter] public string? Subtitle { get; set; }
 
-    private static string Eur(double value) => value.ToString("0", Lt) + " €";
+    private static string Eur(double value) => value.ToString("#,0", Lt) + " €";
+
+    private static string Eur2(double value) => value.ToString("0.00", Lt) + " €";
+
+    private static string Kwh(double value) => value.ToString("#,0", Lt) + " kWh";
 
     private double Pct(double value) => MaxCost <= 0 ? 0 : Math.Round(value * 100 / MaxCost, 1);
 

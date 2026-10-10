@@ -1,5 +1,6 @@
-// Parity check: C# SolarSimulator vs tools/solar_calc.py (flat price, no arbitrage).
-// Run from the repo's project folder:  dotnet run tools/parity/check.cs
+// Parity check: C# SolarSimulator vs tools/solar_calc.py – PV generation and economics without a
+// battery (flat price). The battery follows the project documentation, not the Python model.
+// Run from the repo's project folder:  dotnet run --file tools/parity/check.cs
 #:project ../../vamos.csproj
 using System.Diagnostics;
 using System.Text.Json;
@@ -7,7 +8,7 @@ using vamos.Services;
 
 var root = Path.GetFullPath(Path.Combine(AppContext.GetData("EntryPointFileDirectoryPath") as string ?? "tools/parity", "..", ".."));
 var cases = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "tools", "parity", "cases.json"))).RootElement;
-var p = new SolarOptions(); // defaults mirror solar_calc.py DEFAULTS
+var p = new SolarOptions { ApvaPvPerKw = 0, ApvaBatteryPerKwh = 0 }; // solar_calc.py DEFAULTS, no subsidy
 const double price = 0.20, exportPrice = 0.06;
 var failures = 0;
 
@@ -27,10 +28,10 @@ foreach (var c in cases.EnumerateArray())
     var load = LoadProfileBuilder.Synthetic(kwh, LoadProfileBuilder.ParseHours(peak));
     var house = type == "namas";
     var scan = SolarSimulator.Analyze(load,
-        house ? p.HouseKwpOptions : p.FlatKwpOptions,
-        house ? p.HouseBatteryOptions : p.FlatBatteryOptions,
+        house ? p.HouseKwpOptions : new[] { 0.4, 0.8 },
+        new[] { 0.0 },
         r => r.Import * price - r.Export * exportPrice,
-        p, new SimOptions(p.Yield, p.BatteryEff, p.Dod, p.CRate), p.PvCostPerKwp);
+        p, new SimOptions(p.Yield, p.BatteryEff, p.CRate), p.PvCostPerKwp);
 
     void Compare(string label, JsonElement expected, SolarOption? actual)
     {
@@ -47,11 +48,9 @@ foreach (var c in cases.EnumerateArray())
         Console.WriteLine($"  {(ok ? "OK  " : "FAIL")} {label}: py {expected.GetProperty("pv_kwp")} kWp+{expected.GetProperty("batt_kwh")} NPV {expected.GetProperty("npv_eur")} pb {pyPb} | cs {actual.PvKwp} kWp+{actual.BattKwh} NPV {actual.Npv} pb {actual.PaybackYears}");
     }
 
-    Console.WriteLine($"{c.GetProperty("name").GetString()}: verdict py solar={py.GetProperty("solar_worth_it")} batt={py.GetProperty("battery_worth_it")} | cs solar={scan.SolarWorthIt} batt={scan.BatteryWorthIt}");
-    if (py.GetProperty("solar_worth_it").GetBoolean() != scan.SolarWorthIt || py.GetProperty("battery_worth_it").GetBoolean() != scan.BatteryWorthIt) failures++;
-    Compare("best_overall", py.GetProperty("best_overall"), scan.BestOverall);
+    Console.WriteLine($"{c.GetProperty("name").GetString()}: verdict py solar={py.GetProperty("solar_worth_it")} | cs solar={scan.SolarWorthIt}");
+    if (py.GetProperty("solar_worth_it").GetBoolean() != scan.SolarWorthIt) failures++;
     Compare("best_pv_only", py.GetProperty("best_pv_only"), scan.BestPvOnly);
-    Compare("best_with_battery", py.GetProperty("best_with_battery"), scan.BestWithBattery);
 }
 
 Console.WriteLine(failures == 0 ? "PARITY OK" : $"PARITY FAILED ({failures})");
