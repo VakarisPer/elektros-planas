@@ -2,60 +2,64 @@
 
 **Hack4Vilnius projektas**
 
-> ⚠️ Tai dar ankstyva versija. Čia jau veikia apklausos vedlys su medžiu (tree questioning),
-> failo įkėlimas ir atsakymų išsaugojimas; planų palyginimo logika bus pridėta vėliau.
-
 ## Tema
 
 Kaip padėti vilniečiams išsirinkti jiems tinkamiausią elektros planą remiantis asmeniniais vartojimo duomenimis?
 
-Fiksuotas ar lankstus tarifas? Ne visi žino, kuris planas jiems tinka geriausiai. Sprendimas, remdamasis vartotojo įpročiais ir duomenimis, padės pasirinkti tinkamiausią elektros planą bei įvertinti galimas rizikas ir naudą.
+Fiksuotas ar lankstus tarifas? Ne visi žino, kuris planas jiems tinka geriausiai. Sprendimas, remdamasis vartotojo įpročiais ir duomenimis, padeda pasirinkti tinkamiausią elektros planą (Elektrum, Ignitis, Enefit) bei įvertinti galimas rizikas ir naudą.
 
 ## Kaip veikia
 
-1. **Įkėlimas** (`/upload`) — galima įkelti elektros suvartojimo failą (`.csv` / `.txt`).
-   Taisyklėmis paremtas analizatorius nuskaito datą/laiką ir kWh, suskaičiuoja mėnesinį
-   vidurkį bei naktinio vartojimo dalį ir **automatiškai atsako** su vartojimu susijusius
-   klausimus (juos galima pataisyti).
-2. **Apklausa** (`/survey/1` … `/survey/{id}`) — **vienas klausimas = vienas puslapis**.
-   Klausimai sudėlioti į medį: neaktuolūs klausimai praleidžiami pagal ankstesnius
-   atsakymus (žr. `Data/Questionnaire.cs`, laukas `ShowWhen`).
-3. **Rezultatai** (`/results`) — atsakymų suvestinė + mygtukas išsaugoti `.txt`.
+1. **AI asistentas** (`/assistant`) — pagrindinis kelias. Agentas (Microsoft Agent Framework per
+   OpenRouter) pats parenka kitą informatyviausią klausimą iš klausimų banko, kad su kuo mažiau
+   klausimų gautų patikimą išvadą (adaptyvus *tree questioning*). Atsakoma mygtukais arba laisvu tekstu.
+2. **Duomenų įkėlimas** (`/upload`) — ESO suvartojimo failas (`.csv` / `.txt`). Analizatorius
+   suskaičiuoja mėnesinį vidurkį ir naktinio vartojimo dalį ir automatiškai atsako į susijusius klausimus.
+3. **Skaičiuoklė** (`Services/PlanCalculator.cs`) — deterministiškai suskaičiuoja kiekvieno tiekėjo
+   fiksuoto, biržos ir dviejų zonų plano metinę kainą (įprasti / pigūs / brangūs metai) ir riziką.
+   AI skaičių negalvoja – tik paaiškina skaičiuoklės rezultatą.
+4. **Rezultatai** (`/results`) — rekomendacija, planų palyginimas, profilis, `.txt` atsisiuntimas.
+5. **Saulės elektrinė ir kaupiklis** (`Services/SolarAdvisor.cs`, `SolarSimulator.cs`) – `tools/solar_calc.py`
+   logika perkelta į C# (patikrinta su Python: `dotnet run tools/parity/check.cs`). Jei saulė domina, rezultatuose
+   rodoma optimali elektrinė, atsipirkimas, NPV ir visa mėnesio sąskaita kiekvienam plano tipui. Turintiems elektrinę
+   (tik ~1 % jų turi kaupiklį) vertinama, ar verta įsirengti kaupiklį. Naudojami ESO valandiniai duomenys (P+/P−),
+   jei įkelti. AI agentas skaičiuoklę kviečia įrankiu `simulate_solar`.
+6. **Klasikinė anketa** (`/survey`) — tas pats klausimų medis be AI (pėdoje).
 
-## Apklausos medis (trumpai)
+Be API rakto asistentas veikia **standartiniu režimu**: klausia pagal taisyklių medį ir rekomendaciją
+sudaro skaičiuoklė – demo niekada nesugriūva.
 
-- Visada: Q1–Q7, Q8, Q9, Q10
-- `Q18` (EV krovimo valdymas) — tik jei Q7 = „Taip, kraunu namuose“
-- `Q19` (elektros kaupiklis) — tik jei turi/planuoja elektrinę (Q8)
-- `Q11` (gaming PC) — praleidžiamas, jei Q10 pažymėta „Kriptovaliutų kasimo įranga“
-- `Q17` (požiūris į sąskaitas) — vartai lankstumo blokui
-- `Q15`, `Q16` — tik jei Q17 ≠ „Noriu fiksuotos, stabilios kainos“
-- `Q12` — tik jei Q17 ≠ „…fiksuotos…“ ir Q16 ≠ „Ne, nenoriu keisti rutinos“
-- `Q13` — tik jei Q17 = „tarpinis“ arba „optimizuoti“
+## AI nustatymas (OpenRouter)
 
-Visos taisyklės — viename faile `Data/Questionnaire.cs`.
+```bash
+dotnet user-secrets set "OpenRouter:ApiKey" "sk-or-..."
+```
+
+Modelis keičiamas `appsettings.json` → `OpenRouter:Model` (reikia modelio su *tool calling*,
+pvz. `deepseek/deepseek-v4.1-flash`). `OpenRouter:MaxQuestions` – klausimų limitas.
+
+## Svarbiausi failai
+
+- `Prompts/advisor-system.md` — **sisteminis promptas** (rinkos kontekstas, klausimų parinkimo
+  strategija, įrankių protokolas, išvados struktūra). Keičiamas nekeičiant kodo (užtenka perkrauti programą).
+- `Prompts/scenarios.md` — testinės personos promptui tikrinti.
+- `Data/Questionnaire.cs` — klausimų bankas: tekstai, variantai, `Purpose` (kodėl klausimas svarbus
+  agentui) ir `ShowWhen` (kietos medžio taisyklės – nematomo klausimo agentas paklausti negali).
+- `Services/ElectricityAdvisorAgent.cs` — agentas ir jo įrankiai: `get_profile`, `ask_question`,
+  `record_answer`, `estimate_plans`, `simulate_solar`, `finish`; fallback į taisykles.
+- `Services/PlanCalculator.cs` — profilis iš atsakymų ir planų kainų modelis.
+- `appsettings.json` → `Tariffs` ir `Solar` — **orientaciniai demo tarifai ir prielaidos**, atnaujinkite pagal
+  tiekėjų, montuotojų ir ESO kainas.
+- `tools/solar_calc.py` — originali Python skaičiuoklė (etalonas), `tools/parity/` — palyginimas su C#.
+- `Components/Pages/` — `Home`, `Assistant`, `Upload`, `Results`, `Survey`.
 
 ## Statusas
 
-- [x] Projekto karkasas
-- [x] Apklausos vedlys su medžiu (vienas klausimas = vienas puslapis)
-- [x] Failo įkėlimas ir automatinių atsakymų generavimas
-- [x] Atsakymų išsaugojimas į `.txt` (`data/private/submissions/`)
-- [ ] Planų palyginimo logika
-- [ ] Rizikos ir naudos vertinimas
-
-## Struktūra
-
-- `Components/Pages/Home.razor` — titulinis
-- `Components/Pages/Upload.razor` — failo įkėlimas (`/upload`)
-- `Components/Pages/Survey.razor` — vedlys (`/survey/{id}`)
-- `Components/Pages/Results.razor` — suvestinė (`/results`)
-- `Components/Survey/` — `QuestionCard`, `ProgressBar`
-- `Data/Questionnaire.cs` — klausimai, pasirinkimai ir medžio sąlygos
-- `Models/` — `Question`, `Answer`, `ShowCondition`, `ConsumptionAnalysis`, `SurveySnapshot`
-- `Services/QuestionnaireState.cs` — būsena, medžio ėjimas, `localStorage`
-- `Services/ConsumptionAnalyzer.cs` — suvartojimo failo analizė
-- `Services/SubmissionWriter.cs` — `.txt` failo rašymas
+- [x] Klausimų bankas su medžio sąlygomis (saulė, kaupiklis, išmanusis skaitiklis, EV, rizika)
+- [x] Failo įkėlimas ir automatiniai atsakymai
+- [x] AI asistentas (Agent Framework + OpenRouter) su adaptyviu klausimų parinkimu
+- [x] Planų palyginimas, rizikos ir naudos vertinimas
+- [ ] Tikri, automatiškai atnaujinami tiekėjų tarifai ir Nord Pool kainos
 
 ## Paleidimas
 
@@ -65,4 +69,7 @@ dotnet run
 
 ## Technologijos
 
-- .NET / ASP.NET Core (Blazor) — `net10.0`
+- .NET 10 / ASP.NET Core Blazor (Interactive Server)
+- Microsoft Agent Framework (`Microsoft.Agents.AI`), `Microsoft.Extensions.AI.OpenAI`
+- OpenRouter (OpenAI-suderinamas API)
+- Markdig (AI teksto atvaizdavimas)

@@ -1,0 +1,100 @@
+@inject QuestionnaireState State
+
+@* Answer picker for the assistant chat: single choice submits on click, multi choice needs "Patvirtinti". *@
+<div class="option-chips">
+    <div class="chips">
+        @foreach (var option in Question.Options)
+        {
+            var selected = Answer.SelectedOptions.Contains(option);
+            <button type="button" class="chip @(selected ? "selected" : null)" disabled="@Disabled"
+                    aria-pressed="@selected" @onclick="() => Pick(option)">
+                @if (Question.IsMultiSelect)
+                {
+                    <span aria-hidden="true">@(selected ? "✓ " : "+ ")</span>
+                }
+                @option
+            </button>
+        }
+
+        @if (Question.AllowCustom)
+        {
+            <button type="button" class="chip @(_customOpen ? "selected" : null)" disabled="@Disabled"
+                    @onclick="ToggleCustom">
+                Kita…
+            </button>
+        }
+    </div>
+
+    @if (_customOpen)
+    {
+        <div class="custom-row">
+            <input class="form-control" placeholder="Įrašykite savo atsakymą" @bind="_customText"
+                   @bind:event="oninput" @onkeydown="OnCustomKey" disabled="@Disabled" />
+            <button type="button" class="btn btn-primary" disabled="@(Disabled || string.IsNullOrWhiteSpace(_customText))"
+                    @onclick="SubmitCustom">
+                Pateikti
+            </button>
+        </div>
+    }
+
+    @if (Question.IsMultiSelect)
+    {
+        <div class="multi-row">
+            <span class="muted small">Galima pasirinkti kelis</span>
+            <button type="button" class="btn btn-primary btn-sm"
+                    disabled="@(Disabled || !State.IsQuestionAnswered(Question))" @onclick="Submit">
+                Patvirtinti →
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = default!;
+    [Parameter, EditorRequired] public Answer Answer { get; set; } = default!;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnSubmit { get; set; }
+
+    private bool _customOpen;
+    private string? _customText;
+
+    private async Task Pick(string option)
+    {
+        if (Question.IsMultiSelect)
+        {
+            State.ToggleMulti(Question.Id, option, !Answer.SelectedOptions.Contains(option), Question.ExclusiveOption);
+            return;
+        }
+
+        State.SetSingle(Question.Id, option);
+        await OnSubmit.InvokeAsync();
+    }
+
+    private void ToggleCustom() => _customOpen = !_customOpen;
+
+    private async Task OnCustomKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_customText))
+        {
+            await SubmitCustom();
+        }
+    }
+
+    private async Task SubmitCustom()
+    {
+        if (Question.IsMultiSelect)
+        {
+            State.ToggleMulti(Question.Id, Models.Question.CustomOption, true, Question.ExclusiveOption);
+        }
+        else
+        {
+            State.SetSingle(Question.Id, Models.Question.CustomOption);
+        }
+
+        State.SetCustomText(Question.Id, _customText);
+        _customOpen = false;
+        await OnSubmit.InvokeAsync();
+    }
+
+    private Task Submit() => OnSubmit.InvokeAsync();
+}

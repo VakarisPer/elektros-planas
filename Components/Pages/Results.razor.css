@@ -1,0 +1,255 @@
+.empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+}
+
+.hero-rec {
+    background: linear-gradient(135deg, var(--brand-soft), var(--surface) 60%);
+    margin-bottom: 2rem;
+}
+
+.hero-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.hero-label {
+    color: var(--muted);
+    font-size: .85rem;
+    font-weight: 600;
+}
+
+.hero-plan {
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    font-weight: 800;
+    letter-spacing: -.03em;
+    line-height: 1.15;
+}
+
+.hero-supplier {
+    color: var(--brand);
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.hero-badges {
+    display: flex;
+    gap: .4rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.hero-text {
+    border-top: 1px solid var(--line);
+    padding-top: 1rem;
+}
+
+.section-title {
+    font-size: 1.15rem;
+    margin: 0 0 .85rem;
+}
+
+.plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.two-col {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+    align-items: start;
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: .45rem 1rem;
+    margin: 0;
+    font-size: .92rem;
+}
+
+    .facts dt {
+        color: var(--muted);
+        font-weight: 500;
+    }
+
+    .facts dd {
+        margin: 0;
+        font-weight: 600;
+        text-align: right;
+    }
+
+.note {
+    font-size: .85rem;
+    color: var(--muted);
+    margin: .75rem 0 0;
+}
+
+.plans-table {
+    width: 100%;
+    margin-top: .75rem;
+    font-size: .88rem;
+}
+
+    .plans-table th {
+        color: var(--muted);
+        font-weight: 600;
+        padding-bottom: .4rem;
+    }
+
+    .plans-table td {
+        padding: .3rem 0;
+        border-top: 1px solid var(--line);
+    }
+
+.answers {
+    list-style: none;
+    padding: 0;
+    margin: .75rem 0 0;
+    display: grid;
+    gap: .65rem;
+}
+
+    .answers .q {
+        color: var(--muted);
+        font-size: .85rem;
+    }
+
+    .answers .a {
+        font-weight: 600;
+    }
+
+.actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+}
+
+hr {
+    border-color: var(--line);
+    opacity: 1;
+}
+
+/* ── Solar section ─────────────────────────────────────────────── */
+.solar {
+    margin-top: 2rem;
+    background: linear-gradient(160deg, var(--accent-soft), var(--surface) 45%);
+}
+
+.solar-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+    .solar-head h2 {
+        font-size: clamp(1.3rem, 3vw, 1.7rem);
+        margin: .25rem 0 .35rem;
+    }
+
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+}
+
+.kpi {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: .75rem .9rem;
+}
+
+.kpi-label {
+    color: var(--muted);
+    font-size: .8rem;
+}
+
+.kpi-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+}
+
+.solar-sub {
+    font-size: 1rem;
+    margin: 1.5rem 0 .5rem;
+}
+
+.months {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: .35rem;
+    height: 160px;
+    align-items: end;
+}
+
+.month {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.bars {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 2px;
+}
+
+.bar {
+    width: 45%;
+    min-height: 2px;
+    border-radius: 4px 4px 0 0;
+}
+
+.bar-before, .swatch-before {
+    background: color-mix(in srgb, var(--muted) 35%, transparent);
+}
+
+.bar-after, .swatch-after {
+    background: var(--brand);
+}
+
+.month-label {
+    text-align: center;
+    font-size: .72rem;
+    color: var(--muted);
+    margin-top: .25rem;
+}
+
+.legend {
+    display: flex;
+    gap: 1rem;
+    margin-top: .5rem;
+}
+
+.swatch {
+    display: inline-block;
+    width: .75rem;
+    height: .75rem;
+    border-radius: 3px;
+    margin-right: .35rem;
+    vertical-align: -1px;
+}
+
+.batt-table td {
+    vertical-align: middle;
+}
+
+@media (max-width: 560px) {
+    .months { gap: .15rem; height: 130px; }
+    .month-label { font-size: .62rem; }
+    .batt-table { font-size: .8rem; }
+}

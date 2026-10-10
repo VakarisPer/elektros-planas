@@ -1,47 +1,52 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Elektros planas</PageTitle>
+<PageTitle>Elektros planas · Fiksuotas ar lankstus?</PageTitle>
 
-<div class="py-4">
-    <h1 class="display-6 fw-bold">Elektros planas</h1>
-    <p class="lead">
-        Padėsime vilniečiams išsirinkti tinkamiausią elektros planą pagal jų vartojimo įpročius.
+<section class="hero">
+    <span class="pill pill-brand">Vilniečiams · Elektrum · Ignitis · Enefit</span>
+    <h1>Fiksuotas ar lankstus elektros planas?<br /><span class="grad">Sužinokite per 3 minutes.</span></h1>
+    <p class="lead-text">
+        AI patarėjas užduos tik tuos klausimus, kurie svarbūs būtent jums, palygins planus pagal jūsų įpročius
+        ir parodys ne tik galimą sutaupymą, bet ir riziką.
     </p>
-
-    <div class="d-flex flex-wrap gap-2 mt-2">
-        <a class="btn btn-primary btn-lg" href="/upload">Įkelti suvartojimo failą</a>
-        <a class="btn btn-outline-primary btn-lg" href="/survey">Pradėti apklausą</a>
+    <div class="cta">
+        <a class="btn btn-primary btn-lg" href="assistant">Kalbėtis su asistentu →</a>
+        <a class="btn btn-outline-secondary btn-lg" href="upload">Įkelti ESO duomenis</a>
     </div>
-</div>
+</section>
 
-<div class="row g-3">
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h2 class="h5 card-title">1. Duomenys</h2>
-                <p class="card-text mb-0">
-                    Įkelkite suvartojimo failą – dalį klausimų atsakysime automatiškai,
-                    arba atsakykite rankiniu būdu.
-                </p>
-            </div>
+<section class="steps">
+    <div class="step panel">
+        <div class="step-num">1</div>
+        <h2>Pokalbis, ne anketa</h2>
+        <p>Klausimai parenkami pagal ankstesnius atsakymus – jei neturite elektromobilio, apie jį neklausime.</p>
+    </div>
+    <div class="step panel">
+        <div class="step-num">2</div>
+        <h2>Skaičiai iš jūsų duomenų</h2>
+        <p>Įkelkite ESO suvartojimo failą – įvertinsime, kiek vartojate naktį ir vakare, kada brangiausia.</p>
+    </div>
+    <div class="step panel">
+        <div class="step-num">3</div>
+        <h2>Nauda ir rizika</h2>
+        <p>Matysite kainą įprastais, pigiais ir brangiais metais – ir sprendžiate, kokia rizika jums priimtina.</p>
+    </div>
+</section>
+
+<section class="compare panel">
+    <h2>Trys planų tipai trumpai</h2>
+    <div class="compare-grid">
+        <div>
+            <div class="compare-title">🔒 Fiksuota kaina</div>
+            <p>Ta pati kaina visus metus. Ramu, bet dažniausiai šiek tiek brangiau.</p>
+        </div>
+        <div>
+            <div class="compare-title">📈 Biržos kaina</div>
+            <p>Kaina kinta kas valandą. Pigiau, jei vartojimą perkeliate į naktį, bet galimi šuoliai žiemą.</p>
+        </div>
+        <div>
+            <div class="compare-title">🌙 Dviejų zonų</div>
+            <p>Pigiau naktį ir savaitgaliais. Tarpinis variantas tiems, kurie gali skalbti vakare vėliau.</p>
         </div>
     </div>
-
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h2 class="h5 card-title">2. Planų palyginimas</h2>
-                <p class="card-text mb-0">Palyginkite fiksuotą ir lankstų tarifą.</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h2 class="h5 card-title">3. Rizika ir nauda</h2>
-                <p class="card-text mb-0">Įvertinkite galimą riziką ir naudą.</p>
-            </div>
-        </div>
-    </div>
-</div>
+</section>

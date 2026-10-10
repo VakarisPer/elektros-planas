@@ -18,6 +18,12 @@ public sealed class Question
 
     public string Text { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Why this question matters for the recommendation. Shown to the AI advisor so it can
+    /// decide which question carries the most information next.
+    /// </summary>
+    public string Purpose { get; init; } = string.Empty;
+
     public IReadOnlyList<string> Options { get; init; } = Array.Empty<string>();
 
     /// <summary>When true the user may select several options (checkboxes).</summary>

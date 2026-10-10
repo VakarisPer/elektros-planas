@@ -1,0 +1,69 @@
+@using System.Globalization
+
+@* Plan cost card: the monthly price is the headline, the yearly one is secondary. *@
+<article class="plan-card @(IsRec ? "is-rec" : null)">
+    @if (IsRec)
+    {
+        <div class="plan-ribbon">@RibbonText</div>
+    }
+    <div class="plan-type">@Recommendation.PlanTypeLabel(Plan.Type)</div>
+    <div class="plan-name">@(Subtitle ?? Plan.PlanName)</div>
+    <div class="plan-cost">@Eur(Plan.MonthlyCost)<span>/ mėn.</span></div>
+    <div class="plan-sub">~@Eur(Plan.YearlyCost) per metus · @Plan.EffectivePrice.ToString("0.000", Lt) €/kWh</div>
+
+    <div class="range" title="Per metus: @Eur(Plan.BestCost) – @Eur(Plan.WorstCost)">
+        <div class="range-bar"
+             style="left:@Css(Pct(Plan.BestCost))%; width:@Css(Math.Max(1.5, Pct(Plan.WorstCost) - Pct(Plan.BestCost)))%"></div>
+        <div class="range-dot" style="left:@Css(Pct(Plan.YearlyCost))%"></div>
+    </div>
+    <div class="range-legend">
+        <span>@Eur(Plan.BestCost / 12)/mėn.</span>
+        <span>@Eur(Plan.WorstCost / 12)/mėn.</span>
+    </div>
+
+    <div class="plan-foot">
+        <span class="pill @RiskClass">Rizika: @Plan.RiskLevel</span>
+        @if (CompareTo is { } before)
+        {
+            var diff = (before.YearlyCost - Plan.YearlyCost) / 12;
+            <span class="delta @(diff >= 0 ? "pos" : "neg")">@(diff >= 0 ? "−" : "+")@Eur(Math.Abs(diff))/mėn. @CompareLabel</span>
+        }
+        else if (FixedCost is { } fixedCost && Plan.Type != PlanType.Fixed)
+        {
+            var diff = (fixedCost - Plan.YearlyCost) / 12;
+            <span class="delta @(diff >= 0 ? "pos" : "neg")">@(diff >= 0 ? "−" : "+")@Eur(Math.Abs(diff))/mėn. vs fiksuotas</span>
+        }
+    </div>
+</article>
+
+@code {
+    private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
+
+    [Parameter, EditorRequired] public PlanEstimate Plan { get; set; } = default!;
+    [Parameter] public bool IsRec { get; set; }
+    [Parameter] public string RibbonText { get; set; } = "Rekomenduojama";
+
+    /// <summary>Largest yearly cost on the row – scales the range bar.</summary>
+    [Parameter] public double MaxCost { get; set; }
+
+    /// <summary>Yearly cost of the fixed plan, for the "vs fiksuotas" delta.</summary>
+    [Parameter] public double? FixedCost { get; set; }
+
+    /// <summary>Same plan type before a change (e.g. without solar); overrides the fixed delta.</summary>
+    [Parameter] public PlanEstimate? CompareTo { get; set; }
+    [Parameter] public string CompareLabel { get; set; } = "vs be saulės";
+    [Parameter] public string? Subtitle { get; set; }
+
+    private static string Eur(double value) => value.ToString("0", Lt) + " €";
+
+    private double Pct(double value) => MaxCost <= 0 ? 0 : Math.Round(value * 100 / MaxCost, 1);
+
+    private static string Css(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private string RiskClass => Plan.RiskLevel switch
+    {
+        "Aukšta" => "pill-danger",
+        "Vidutinė" => "pill-accent",
+        _ => "pill-ok"
+    };
+}

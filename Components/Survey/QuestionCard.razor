@@ -1,81 +1,60 @@
 @inject QuestionnaireState State
 
-<div class="card mb-3">
-    <div class="card-body">
-        <h3 class="h6 mb-1">@Question.Id. @Question.Text</h3>
+<div class="panel mb-3">
+    <h2 class="h5 mb-1">@Question.Text</h2>
 
-        @if (Question.IsMultiSelect)
+    @if (Question.IsMultiSelect)
+    {
+        <p class="muted small mb-0">Galima pasirinkti kelis variantus.</p>
+    }
+
+    <div class="option-list mt-3">
+        @for (var i = 0; i < Question.Options.Count; i++)
         {
-            <p class="text-muted small mb-2">Galima pasirinkti kelis variantus.</p>
+            var option = Question.Options[i];
+            var inputId = $"q-{Question.Id}-{i}";
+            var isChecked = Answer.SelectedOptions.Contains(option);
+
+            <label class="option-card @(isChecked ? "selected" : null)" for="@inputId">
+                @if (Question.IsMultiSelect)
+                {
+                    <input type="checkbox" name="q-@Question.Id" id="@inputId" checked="@isChecked"
+                           @onchange="e => OnMultiOptionChanged(option, (bool)e.Value!)" />
+                }
+                else
+                {
+                    <input type="radio" name="q-@Question.Id" id="@inputId" checked="@isChecked"
+                           @onchange="() => OnSingleOptionChanged(option)" />
+                }
+                <span>@option</span>
+            </label>
         }
 
-        <div class="mt-2">
-            @for (var i = 0; i < Question.Options.Count; i++)
-            {
-                var option = Question.Options[i];
-                var inputId = $"q-{Question.Id}-{i}";
-                var isChecked = Answer.SelectedOptions.Contains(option);
+        @if (Question.AllowCustom)
+        {
+            var customId = $"q-{Question.Id}-custom";
+            var customSelected = Answer.SelectedOptions.Contains(Question.CustomOption);
 
-                <div class="form-check">
-                    @if (Question.IsMultiSelect)
-                    {
-                        <input class="form-check-input"
-                               type="checkbox"
-                               name="q-@Question.Id"
-                               id="@inputId"
-                               checked="@isChecked"
-                               @onchange="e => OnMultiOptionChanged(option, (bool)e.Value!)" />
-                    }
-                    else
-                    {
-                        <input class="form-check-input"
-                               type="radio"
-                               name="q-@Question.Id"
-                               id="@inputId"
-                               checked="@isChecked"
-                               @onchange="() => OnSingleOptionChanged(option)" />
-                    }
-                    <label class="form-check-label" for="@inputId">@option</label>
-                </div>
-            }
-
-            @if (Question.AllowCustom)
-            {
-                var customId = $"q-{Question.Id}-custom";
-                var customSelected = Answer.SelectedOptions.Contains(Question.CustomOption);
-
-                <div class="form-check">
-                    @if (Question.IsMultiSelect)
-                    {
-                        <input class="form-check-input"
-                               type="checkbox"
-                               name="q-@Question.Id"
-                               id="@customId"
-                               checked="@customSelected"
-                               @onchange="e => OnMultiOptionChanged(Question.CustomOption, (bool)e.Value!)" />
-                    }
-                    else
-                    {
-                        <input class="form-check-input"
-                               type="radio"
-                               name="q-@Question.Id"
-                               id="@customId"
-                               checked="@customSelected"
-                               @onchange="() => OnSingleOptionChanged(Question.CustomOption)" />
-                    }
-                    <label class="form-check-label" for="@customId">Kita (įrašyti savo)</label>
-                </div>
-
-                @if (customSelected)
+            <label class="option-card @(customSelected ? "selected" : null)" for="@customId">
+                @if (Question.IsMultiSelect)
                 {
-                    <input type="text"
-                           class="form-control form-control-sm mt-1"
-                           value="@Answer.CustomText"
-                           placeholder="Įrašykite savo variantą"
-                           @onchange="OnCustomTextChanged" />
+                    <input type="checkbox" name="q-@Question.Id" id="@customId" checked="@customSelected"
+                           @onchange="e => OnMultiOptionChanged(Question.CustomOption, (bool)e.Value!)" />
                 }
+                else
+                {
+                    <input type="radio" name="q-@Question.Id" id="@customId" checked="@customSelected"
+                           @onchange="() => OnSingleOptionChanged(Question.CustomOption)" />
+                }
+                <span>Kita (įrašyti savo)</span>
+            </label>
+
+            @if (customSelected)
+            {
+                <input type="text" class="form-control" value="@Answer.CustomText"
+                       placeholder="Įrašykite savo variantą" @onchange="OnCustomTextChanged" />
             }
-        </div>
+        }
     </div>
 </div>
 

@@ -2,83 +2,315 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Globalization
 @inject QuestionnaireState State
+@inject PlanCalculator Calculator
+@inject SolarAdvisor Solar
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<PageTitle>Rezultatai</PageTitle>
+<PageTitle>Rezultatai · Elektros planas</PageTitle>
 
-<h1 class="h4">Jūsų atsakymai</h1>
-<p class="text-muted">Planų palyginimas ir rekomendacija bus pridėti vėliau.</p>
-
-@if (State.Analysis is { } analysis)
+@if (!_loaded)
 {
-    <div class="alert @(analysis.Success ? "alert-info" : "alert-warning")">
-        @if (analysis.Success)
-        {
-            <div><strong>Įkelto failo analizė:</strong> @analysis.FileName</div>
-            <div>Įrašų: @analysis.Readings, mėnesių: @analysis.Months</div>
-            @if (analysis.MonthlyAverageKwh is { } average)
-            {
-                <div>Vidutiniškai: @Format(average) kWh/mėn.</div>
-            }
-            @if (analysis.NightShare is { } night)
-            {
-                <div>Naktinis suvartojimas: @((night * 100).ToString("0", Lt)) %</div>
-            }
-        }
-        else
-        {
-            <div><strong>Failo nuskaityti nepavyko:</strong> @analysis.Error</div>
-        }
+    <p class="muted">Kraunama…</p>
+}
+else if (State.AnsweredQuestions().Count == 0 && State.Analysis is not { Success: true })
+{
+    <div class="panel empty">
+        <div class="eyebrow">Dar nėra duomenų</div>
+        <h1 class="h3 mt-1">Atsakykite į kelis klausimus</h1>
+        <p class="muted">Asistentas užduos tik tuos klausimus, kurie svarbūs jūsų situacijai.</p>
+        <a class="btn btn-primary btn-lg" href="assistant">Pradėti su asistentu →</a>
     </div>
 }
-
-@foreach (var section in Sections)
+else
 {
-    <h2 class="h6 mt-4">@section</h2>
-    <ul class="list-group">
-        @foreach (var question in Questionnaire.Questions.Where(q => q.Section == section && State.IsVisible(q)))
-        {
-            var answer = State.GetAnswer(question.Id);
+    var rec = State.Recommendation;
+    var best = PlanCalculator.BestPerType(_estimates);
+    var recommendedType = rec?.PlanType ?? best[0].Type;
+    var maxCost = _estimates.Max(e => e.WorstCost);
 
-            <li class="list-group-item">
-                <div class="fw-semibold">@question.Id. @question.Text</div>
+    <div class="page-head">
+        <div class="eyebrow">Jūsų rezultatas</div>
+        <h1>@(rec is null ? "Preliminarus palyginimas" : "Mūsų rekomendacija")</h1>
+        <p>Energijos dalies kaina per metus (be ESO skirstymo mokesčio, kuris visiems tiekėjams vienodas).</p>
+    </div>
+
+    @if (rec is not null)
+    {
+        <section class="panel hero-rec">
+            <div class="hero-top">
                 <div>
-                    @QuestionnaireState.FormatAnswer(answer)
-                    @if (answer.IsAuto)
-                    {
-                        <span class="badge text-bg-info ms-1">automatinis</span>
-                    }
+                    <div class="hero-label">Rekomenduojamas planas</div>
+                    <div class="hero-plan">@Recommendation.PlanTypeLabel(rec.PlanType)</div>
+                    <div class="hero-supplier">@rec.Supplier</div>
                 </div>
-            </li>
+                <div class="hero-badges">
+                    <span class="pill pill-brand">Pasitikėjimas: @rec.Confidence</span>
+                    <span class="pill">@(rec.ByAi ? "✦ AI analizė" : "Taisyklių analizė")</span>
+                </div>
+            </div>
+            <div class="md hero-text">@Markdown.ToHtml(rec.SummaryMarkdown)</div>
+        </section>
+    }
+    else
+    {
+        <div class="notice notice-warn mb-3">
+            Apklausa dar nebaigta – skaičiai preliminarūs.
+            <a href="assistant">Tęsti su asistentu →</a>
+        </div>
+    }
+
+    <h2 class="section-title">Planų tipų palyginimas</h2>
+    <div class="plan-grid">
+        @foreach (var plan in best)
+        {
+            <PlanCard Plan="plan" IsRec="plan.Type == recommendedType" MaxCost="maxCost"
+                      FixedCost="best.First(b => b.Type == PlanType.Fixed).YearlyCost" />
         }
-    </ul>
-}
+    </div>
+    <p class="muted small mt-2">Juosta rodo intervalą nuo pigių iki brangių metų; taškas – tikėtina kaina.</p>
 
-@if (State.LastSavedPath is { } path)
-{
-    <p class="text-muted small mt-3 mb-0">Atsakymai išsaugoti į: <code>@path</code></p>
-}
+    @if (_solarReport is { } sr)
+    {
+        var isBattery = sr.Mode is SolarMode.AddBattery or SolarMode.HasBattery;
+        // No ribbon when the plans are practically equal (typical under net metering).
+        PlanType? bestWithSolar = sr.WithSolar.Count > 1 && sr.WithSolar[1].YearlyCost - sr.WithSolar[0].YearlyCost >= 12
+            ? sr.WithSolar[0].Type
+            : null;
+        var solarMax = sr.WithSolar.Concat(sr.Baseline).Max(e => e.WorstCost);
+        var monthMax = Math.Max(1, sr.MonthlyBillBefore.Concat(sr.MonthlyBillAfter).Max());
 
-<div class="d-flex flex-wrap gap-2 mt-4">
-    <button type="button" class="btn btn-primary" @onclick="SaveAgain">Išsaugoti .txt dar kartą</button>
-    <button type="button" class="btn btn-outline-secondary" @onclick="Restart">Pildyti iš naujo</button>
-</div>
+        <section class="solar panel">
+            <div class="solar-head">
+                <div>
+                    <div class="eyebrow">@(isBattery ? "☀️ Jūsų saulės elektrinė + kaupiklis" : "☀️ Su saulės elektrine")</div>
+                    <h2>@sr.ChosenLabel</h2>
+                    <p class="muted mb-0">@sr.Verdict</p>
+                </div>
+                <span class="pill @(sr.WorthIt ? "pill-ok" : "pill-accent")">@(sr.WorthIt ? "Verta" : "Neverta")</span>
+            </div>
+
+            <div class="kpis">
+                @if (sr.Mode != SolarMode.HasBattery)
+                {
+                    <div class="kpi"><div class="kpi-label">Investicija</div><div class="kpi-value">@Eur(sr.Chosen.Capex)</div></div>
+                    <div class="kpi"><div class="kpi-label">Atsipirkimas</div><div class="kpi-value">@(sr.Chosen.PaybackYears is { } y ? y.ToString("0.#", Lt) + " m." : "—")</div></div>
+                    <div class="kpi"><div class="kpi-label">Nauda per 25 m. (NPV)</div><div class="kpi-value">@Eur(sr.Chosen.Npv)</div></div>
+                }
+                <div class="kpi"><div class="kpi-label">Sutaupoma 1-ais metais</div><div class="kpi-value">@Eur(sr.Chosen.Year1Savings)</div></div>
+                <div class="kpi"><div class="kpi-label">Savarankiškumas</div><div class="kpi-value">@sr.Chosen.SelfSufficiencyPct.ToString("0", Lt) %</div></div>
+            </div>
+
+            <h3 class="solar-sub">Visa mėnesio sąskaita @(isBattery ? "su kaupikliu" : "su saulės elektrine")</h3>
+            <p class="muted small">Čia – visa sąskaita su ESO skirstymu ir kaupimo mokesčiu (viršuje esančios kortelės – tik energijos dalis).</p>
+            <div class="plan-grid">
+                @foreach (var plan in sr.WithSolar)
+                {
+                    <PlanCard Plan="plan" IsRec="plan.Type == bestWithSolar" RibbonText="Geriausia su saule" MaxCost="solarMax"
+                              CompareTo="sr.Baseline.FirstOrDefault(b => b.Type == plan.Type)"
+                              CompareLabel="@(isBattery ? "vs be kaupiklio" : "vs be saulės")" />
+                }
+            </div>
+
+            <h3 class="solar-sub">Sąskaita per mėnesius (@Recommendation.PlanTypeLabel(sr.PlanType).ToLower(Lt), @sr.Supplier)</h3>
+            <div class="months" role="img" aria-label="Mėnesio sąskaita prieš ir po">
+                @for (var m = 0; m < 12; m++)
+                {
+                    var beforeVal = sr.MonthlyBillBefore[m];
+                    var afterVal = sr.MonthlyBillAfter[m];
+                    <div class="month" title="@MonthNames[m]: @Eur(afterVal) (buvo @Eur(beforeVal))">
+                        <div class="bars">
+                            <div class="bar bar-before" style="height:@Css(Math.Max(0, beforeVal) * 100 / monthMax)%"></div>
+                            <div class="bar bar-after" style="height:@Css(Math.Max(0, afterVal) * 100 / monthMax)%"></div>
+                        </div>
+                        <div class="month-label">@MonthNames[m][..3]</div>
+                    </div>
+                }
+            </div>
+            <div class="legend small muted">
+                <span><i class="swatch swatch-before"></i>@(isBattery ? "be kaupiklio" : "dabar")</span>
+                <span><i class="swatch swatch-after"></i>@(isBattery ? "su kaupikliu" : "su saulės elektrine")</span>
+            </div>
+
+            <h3 class="solar-sub">Ar verta kaupiklis? Priklauso nuo plano</h3>
+            <table class="plans-table batt-table">
+                <thead>
+                    <tr><th>Planas</th><th>@(isBattery ? "Be kaupiklio" : "Tik elektrinė")</th><th>Su kaupikliu</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var (type, scan) in sr.ByType)
+                    {
+                        <tr>
+                            <td>@Recommendation.PlanTypeLabel(type)</td>
+                            <td>@(isBattery ? "—" : $"{scan.BestPvOnly.PvKwp:0.#} kWp · {Payback(scan.BestPvOnly)}")</td>
+                            <td>
+                                @if (scan.BestWithBattery is { } wb)
+                                {
+                                    <span>@wb.BattKwh.ToString("0", Lt) kWh · @Payback(wb)</span>
+                                    <span class="pill @(scan.BatteryWorthIt ? "pill-ok" : "pill-danger") ms-1">@(scan.BatteryWorthIt ? "verta" : "neverta")</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (sr.Park is { } park)
+            {
+                <div class="notice mt-3">
+                    <strong>Gyvenate bute?</strong> Vietoj balkono elektrinės galima įsigyti nutolusio saulės parko dalį:
+                    @park.BestOverall.PvKwp.ToString("0.#", Lt) kW už ~@Eur(park.BestOverall.Capex), atsipirktų per
+                    @(park.BestOverall.PaybackYears is { } py ? py.ToString("0.#", Lt) + " m." : "ilgiau nei 25 m.").
+                </div>
+            }
+
+            <details class="fold mt-3">
+                <summary>Kiti variantai ir prielaidos</summary>
+                <ul class="answers">
+                    @foreach (var o in sr.Scan.All.Take(5))
+                    {
+                        <li>
+                            <div class="a">@o.PvKwp.ToString("0.#", Lt) kWp + @o.BattKwh.ToString("0", Lt) kWh</div>
+                            <div class="q">investicija @Eur(o.Capex) · atsipirkimas @Payback(o) · NPV @Eur(o.Npv) · savarankiškumas @o.SelfSufficiencyPct.ToString("0", Lt) %</div>
+                        </li>
+                    }
+                </ul>
+                <p class="note">@sr.Assumptions @(sr.LoadFromFile ? "Skaičiuota pagal jūsų ESO valandinius duomenis." : "Vartojimo profilis įvertintas pagal atsakymus.")</p>
+            </details>
+        </section>
+    }
+
+    <div class="two-col">
+        <section class="panel panel-tight">
+            <h2 class="h6 mb-3">Jūsų profilis</h2>
+            <dl class="facts">
+                <dt>@(_profile!.HasSolar && _profile.ConsumptionFromFile ? "Paimama iš tinklo per metus" : "Metinis suvartojimas")</dt>
+                <dd>@_profile.AnnualKwh.ToString("0", Lt) kWh @(_profile.ConsumptionFromFile ? "(iš failo)" : "(įvertinta)")</dd>
+                @if (_profile.HasSolar)
+                {
+                    <dt>Perkama iš tiekėjo</dt>
+                    <dd>@_profile.PurchasedKwh.ToString("0", Lt) kWh</dd>
+                }
+                <dt>Vartojimas naktį</dt>
+                <dd>@Percent(_profile.NightShare)</dd>
+                <dt>Vartojimas vakare</dt>
+                <dd>@Percent(_profile.EveningShare)</dd>
+                <dt>Galima perkelti</dt>
+                <dd>@Percent(_profile.ShiftPotential)</dd>
+                <dt>Rizikos tolerancija</dt>
+                <dd>@RiskTolerance(_profile.RiskAversion)</dd>
+            </dl>
+            @foreach (var note in _profile.Notes)
+            {
+                <p class="note">ℹ️ @note</p>
+            }
+        </section>
+
+        <section class="panel panel-tight">
+            <details class="fold">
+                <summary>Visi tiekėjų planai (@_estimates.Count)</summary>
+                <table class="plans-table">
+                    <thead>
+                        <tr><th>Planas</th><th>Metams</th><th>Rizika</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in _estimates)
+                        {
+                            <tr>
+                                <td>@e.PlanName</td>
+                                <td>@Eur(e.YearlyCost)</td>
+                                <td>@e.RiskLevel</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </details>
+            <hr />
+            <details class="fold">
+                <summary>Jūsų atsakymai (@State.AnsweredQuestions().Count)</summary>
+                <ul class="answers">
+                    @foreach (var question in State.AnsweredQuestions())
+                    {
+                        var answer = State.GetAnswer(question.Id);
+                        <li>
+                            <div class="q">@question.Text</div>
+                            <div class="a">
+                                @QuestionnaireState.FormatAnswer(answer)
+                                @if (answer.IsAuto)
+                                {
+                                    <span class="pill pill-accent ms-1">iš failo</span>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </details>
+        </section>
+    </div>
+
+    <p class="muted small mt-3">
+        Tarifai orientaciniai (demo), skaičiavimas supaprastintas. Prieš sudarydami sutartį pasitikrinkite aktualias
+        Elektrum, Ignitis ir Enefit sąlygas.
+    </p>
+
+    <div class="actions">
+        <button type="button" class="btn btn-primary" @onclick="Download">Atsisiųsti .txt</button>
+        @if (rec is null)
+        {
+            <a class="btn btn-outline-secondary" href="assistant">Tęsti apklausą</a>
+        }
+        <button type="button" class="btn btn-outline-secondary" @onclick="Restart">Pildyti iš naujo</button>
+    </div>
+}
 
 @code {
     private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
 
-    private IEnumerable<string> Sections =>
-        Questionnaire.Questions.Where(State.IsVisible).Select(q => q.Section).Distinct();
+    private bool _loaded;
+    private HouseholdProfile? _profile;
+    private IReadOnlyList<PlanEstimate> _estimates = Array.Empty<PlanEstimate>();
+    private SolarReport? _solarReport;
 
-    protected override async Task OnParametersSetAsync() => await State.LoadAsync();
+    private static readonly string[] MonthNames =
+    {
+        "Sausis", "Vasaris", "Kovas", "Balandis", "Gegužė", "Birželis",
+        "Liepa", "Rugpjūtis", "Rugsėjis", "Spalis", "Lapkritis", "Gruodis"
+    };
 
-    private static string Format(double value) => value.ToString("0.0", Lt);
+    protected override async Task OnInitializedAsync()
+    {
+        await State.LoadAsync();
+        _profile = Calculator.BuildProfile(State);
+        _estimates = Calculator.Estimate(_profile);
+        _solarReport = Solar.Evaluate(State);
+        _loaded = true;
+    }
 
-    private async Task SaveAgain() => await State.SubmitAsync();
+    private static string Eur(double value) => value.ToString("0", Lt) + " €";
+
+    private static string Percent(double share) => (share * 100).ToString("0", Lt) + " %";
+
+    private static string Payback(SolarOption o) =>
+        o.PaybackYears is { } y ? $"atsiperka per {y.ToString("0.#", Lt)} m." : "neatsiperka";
+
+    private static string Css(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static string RiskTolerance(double aversion) => aversion switch
+    {
+        >= 0.7 => "Žema – svarbu stabilumas",
+        >= 0.4 => "Vidutinė",
+        _ => "Aukšta – galite rizikuoti"
+    };
+
+    private async Task Download()
+    {
+        await State.SubmitAsync();
+        await JS.InvokeVoidAsync("elektra.downloadText", $"elektros-planas-{DateTime.Now:yyyyMMdd-HHmm}.txt", State.BuildTextReport());
+    }
 
     private async Task Restart()
     {
         await State.ResetAsync();
-        Nav.NavigateTo("/survey");
+        Nav.NavigateTo("/assistant", forceLoad: true);
     }
 }

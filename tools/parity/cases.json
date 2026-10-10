@@ -1,0 +1,5 @@
+[
+  { "name": "namas-6000", "type": "namas", "kwh": 6000, "peak": "7-9,17-22" },
+  { "name": "butas-2200", "type": "butas", "kwh": 2200, "peak": "18-22" },
+  { "name": "namas-12000", "type": "namas", "kwh": 12000, "peak": "17-22" }
+]

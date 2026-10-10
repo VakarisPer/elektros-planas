@@ -13,7 +13,7 @@ namespace vamos.Services;
 /// </summary>
 public sealed class QuestionnaireState
 {
-    private const string StorageKey = "elektros-planai.survey.v2";
+    private const string StorageKey = "elektros-planai.survey.v4";
 
     private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
 
@@ -33,6 +33,18 @@ public sealed class QuestionnaireState
     public ConsumptionAnalysis? Analysis { get; set; }
 
     public string? LastSavedPath { get; set; }
+
+    /// <summary>Final advice (AI or rule-based); null until the advisor finishes.</summary>
+    public Recommendation? Recommendation { get; set; }
+
+    /// <summary>Assistant conversation shown on /assistant.</summary>
+    public List<ChatEntry> ChatLog { get; private set; } = new();
+
+    /// <summary>Questions the assistant has asked, in order.</summary>
+    public List<int> AskedQuestionIds { get; private set; } = new();
+
+    /// <summary>Question currently waiting for the user's answer in the assistant.</summary>
+    public int? PendingQuestionId { get; set; }
 
     // ── Answer access ───────────────────────────────────────────────────
 
@@ -213,6 +225,10 @@ public sealed class QuestionnaireState
 
     public bool IsComplete => VisibleQuestions().All(IsQuestionAnswered);
 
+    /// <summary>Visible questions that have an answer, in funnel order.</summary>
+    public IReadOnlyList<Question> AnsweredQuestions() =>
+        Questionnaire.Questions.Where(q => IsVisible(q) && IsQuestionAnswered(q)).ToList();
+
     // ── Persistence ─────────────────────────────────────────────────────
 
     public async Task LoadAsync()
@@ -238,6 +254,10 @@ public sealed class QuestionnaireState
                 CurrentQuestionId = snapshot.CurrentQuestionId;
                 Analysis = snapshot.Analysis;
                 LastSavedPath = snapshot.LastSavedPath;
+                Recommendation = snapshot.Recommendation;
+                ChatLog = snapshot.ChatLog;
+                AskedQuestionIds = snapshot.AskedQuestionIds;
+                PendingQuestionId = snapshot.PendingQuestionId;
             }
         }
         catch (JSException) { }
@@ -251,7 +271,11 @@ public sealed class QuestionnaireState
             Answers = _answers.Values.ToList(),
             CurrentQuestionId = CurrentQuestionId,
             Analysis = Analysis,
-            LastSavedPath = LastSavedPath
+            LastSavedPath = LastSavedPath,
+            Recommendation = Recommendation,
+            ChatLog = ChatLog,
+            AskedQuestionIds = AskedQuestionIds,
+            PendingQuestionId = PendingQuestionId
         };
 
         try
@@ -268,6 +292,10 @@ public sealed class QuestionnaireState
         CurrentQuestionId = Questionnaire.FirstQuestionId;
         Analysis = null;
         LastSavedPath = null;
+        Recommendation = null;
+        ChatLog = new();
+        AskedQuestionIds = new();
+        PendingQuestionId = null;
 
         try
         {
@@ -310,7 +338,14 @@ public sealed class QuestionnaireState
         }
 
         string? section = null;
-        foreach (var question in Questionnaire.Questions.Where(IsVisible))
+        if (Recommendation is { } r)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"Rekomendacija: {Recommendation.PlanTypeLabel(r.PlanType)} ({r.Supplier}), pasitikėjimas: {r.Confidence}");
+            sb.AppendLine(r.SummaryMarkdown);
+        }
+
+        foreach (var question in AnsweredQuestions())
         {
             if (question.Section != section)
             {

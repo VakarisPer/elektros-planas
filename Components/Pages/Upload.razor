@@ -4,33 +4,68 @@
 @inject QuestionnaireState State
 @inject ConsumptionAnalyzer Analyzer
 
-<PageTitle>Įkelti duomenis</PageTitle>
+<PageTitle>Duomenys · Elektros planas</PageTitle>
 
-<h1 class="h4">Įkelkite elektros suvartojimo failą</h1>
-<p class="text-muted">
-    Priimami <code>.csv</code> ir <code>.txt</code> failai su data/laiku ir suvartojimu (kWh).
-    Įkėlus failą, su vartojimu susiję klausimai bus atsakyti automatiškai – juos galėsite pataisyti.
-</p>
-
-<div class="mb-3">
-    <InputFile OnChange="OnFileSelected" accept=".csv,.txt" class="form-control" />
+<div class="page-head">
+    <div class="eyebrow">Neprivaloma, bet labai padeda</div>
+    <h1>Įkelkite elektros suvartojimo duomenis</h1>
+    <p>
+        Atsisiųskite valandinius duomenis iš <strong>mano.eso.lt</strong> (CSV) ir įkelkite čia. Apskaičiuosime vidutinį
+        suvartojimą ir naktinio vartojimo dalį – asistentui nebereikės to klausti.
+    </p>
 </div>
+
+<label class="dropzone @(_loading ? "is-loading" : null)">
+    <InputFile OnChange="OnFileSelected" accept=".csv,.txt" class="dropzone-input" />
+    <span class="dropzone-icon" aria-hidden="true">📄</span>
+    <span class="dropzone-title">@(_loading ? "Analizuojama…" : "Pasirinkite arba nutempkite failą")</span>
+    <span class="muted small">.csv arba .txt su data/laiku ir kWh, iki 20 MB</span>
+</label>
 
 @if (_message is not null)
 {
-    <div class="alert @(_success ? "alert-success" : "alert-warning")">@_message</div>
+    <div class="notice @(_success ? "notice-ok" : "notice-warn") mt-3">@_message</div>
 }
 
-<div class="d-flex flex-wrap gap-2 mt-3">
-    <a class="btn btn-primary" href="/survey">@(_success ? "Tęsti apklausą →" : "Pradėti apklausą →")</a>
-    <a class="btn btn-outline-secondary" href="/results">Rezultatai</a>
+@if (State.Analysis is { Success: true } a)
+{
+    <div class="stats">
+        <div class="stat panel panel-tight">
+            <div class="stat-label">@(a.ExportedMonthlyKwh is null ? "Vidutiniškai per mėn." : "Perkama iš tinklo per mėn.")</div>
+            <div class="stat-value">@(a.MonthlyAverageKwh?.ToString("0", Lt) ?? "—") <span>kWh</span></div>
+        </div>
+        <div class="stat panel panel-tight">
+            <div class="stat-label">Naktinis vartojimas</div>
+            <div class="stat-value">@(a.NightShare is { } n ? (n * 100).ToString("0", Lt) : "—") <span>%</span></div>
+        </div>
+        @if (a.ExportedMonthlyKwh is { } exported)
+        {
+            <div class="stat panel panel-tight">
+                <div class="stat-label">Atiduodama į tinklą per mėn.</div>
+                <div class="stat-value">@exported.ToString("0", Lt) <span>kWh</span></div>
+            </div>
+        }
+        <div class="stat panel panel-tight">
+            <div class="stat-label">Laikotarpis</div>
+            <div class="stat-value">@a.Months <span>mėn.</span></div>
+        </div>
+    </div>
+}
+
+<div class="d-flex flex-wrap gap-2 mt-4">
+    <a class="btn btn-primary btn-lg" href="assistant">@(_success ? "Tęsti su asistentu →" : "Eiti į asistentą →")</a>
 </div>
+
+<p class="muted small mt-3 mb-0">Failas apdorojamas serveryje tik analizei ir niekur nesiunčiamas.</p>
 
 @code {
     private static readonly CultureInfo Lt = CultureInfo.GetCultureInfo("lt-LT");
 
     private bool _success;
+    private bool _loading;
     private string? _message;
+
+    protected override async Task OnInitializedAsync() => await State.LoadAsync();
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
@@ -40,46 +75,64 @@
             return;
         }
 
-        using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer);
-        buffer.Position = 0;
-
-        var analysis = Analyzer.Analyze(buffer, file.Name);
-        State.Analysis = analysis;
-
-        if (analysis.Success)
+        _loading = true;
+        try
         {
-            // The "model" answers the consumption questions so the user does not have to.
-            if (analysis.MonthlyAverageKwh is { } average)
-            {
-                State.SetAutoAnswer(3, MonthlyRangeLabel(average));
-            }
+            using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            buffer.Position = 0;
 
-            if (analysis.PeakPeriodLabel is not null)
+            var analysis = Analyzer.Analyze(buffer, file.Name);
+            State.Analysis = analysis;
+
+            if (analysis.Success)
             {
-                State.SetAutoAnswer(15, analysis.PeakPeriodLabel);
+                // The analyzer answers the consumption questions so the user does not have to.
+                if (analysis.MonthlyAverageKwh is { } average)
+                {
+                    State.SetAutoAnswer(3, MonthlyRangeLabel(average));
+                }
+
+                if (analysis.PeakPeriodLabel is not null)
+                {
+                    State.SetAutoAnswer(15, analysis.PeakPeriodLabel);
+                }
+
+                // Energy given back to the grid means an own solar plant.
+                if (analysis.ExportedMonthlyKwh is > 1)
+                {
+                    State.SetAutoAnswer(8, Questionnaire.OwnSolar);
+                }
+
+                // Hourly data can only come from a smart meter.
+                if (analysis.NightShare is not null)
+                {
+                    State.SetAutoAnswer(20, Questionnaire.SmartMeterYes);
+                }
+
+                _success = true;
+                _message = $"Nuskaityta {analysis.Readings} įrašų ({analysis.Months} mėn.). " +
+                           "Su vartojimu susiję klausimai užpildyti automatiškai.";
+            }
+            else
+            {
+                _success = false;
+                _message = analysis.Error;
             }
 
             await State.SaveAsync();
-
-            _success = true;
-            _message = $"Nuskaityta {analysis.Readings} įrašų ({analysis.Months} mėn.). " +
-                       $"Vidutiniškai {analysis.MonthlyAverageKwh!.Value.ToString("0.0", Lt)} kWh/mėn. " +
-                       "Su vartojimu susiję klausimai užpildyti automatiškai.";
         }
-        else
+        finally
         {
-            _success = false;
-            _message = analysis.Error;
-            await State.SaveAsync();
+            _loading = false;
         }
     }
 
     private static string MonthlyRangeLabel(double kwh) => kwh switch
     {
-        < 150 => "Iki 150 kWh",
-        <= 300 => "150–300 kWh",
-        _ => "Virš 300 kWh"
+        < 150 => Questionnaire.MonthlyLow,
+        <= 300 => Questionnaire.MonthlyMid,
+        _ => Questionnaire.MonthlyHigh
     };
 }

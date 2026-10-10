@@ -3,22 +3,27 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject QuestionnaireState State
 @inject NavigationManager Nav
+@inject PlanCalculator Calculator
+@inject SolarAdvisor Solar
 
-<PageTitle>Apklausa</PageTitle>
+<PageTitle>Klasikinė anketa · Elektros planas</PageTitle>
 
 @if (_question is null)
 {
-    <p class="text-muted">Kraunama…</p>
+    <p class="muted">Kraunama…</p>
 }
 else
 {
     <ProgressBar Current="State.PositionOf(_question.Id)" Total="State.VisibleCount" />
 
-    <h1 class="h4 mt-3">@_question.Section</h1>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-2">
+        <div class="eyebrow">@_question.Section</div>
+        <a class="small" href="assistant">Pereiti prie AI asistento →</a>
+    </div>
 
     @if (Answer.IsAuto)
     {
-        <span class="badge text-bg-info mb-2">Automatinis atsakymas (iš įkelto failo) – galite pataisyti</span>
+        <span class="pill pill-accent mb-2">Atsakyta automatiškai iš įkelto failo – galite pataisyti</span>
     }
 
     <QuestionCard Question="_question" Answer="Answer" OnAnswerChanged="StateHasChanged" />
@@ -41,7 +46,7 @@ else
 
     @if (!State.IsQuestionAnswered(_question))
     {
-        <p class="text-muted small mt-2 mb-0">Pasirinkite atsakymą, kad galėtumėte tęsti.</p>
+        <p class="muted small mt-2 mb-0">Pasirinkite atsakymą, kad galėtumėte tęsti.</p>
     }
 }
 
@@ -121,6 +126,14 @@ else
             }
         }
 
+        var profile = Calculator.BuildProfile(State);
+        var recommendation = Calculator.RuleBasedRecommendation(profile, Calculator.Estimate(profile));
+        if (Solar.Evaluate(State) is { } solar)
+        {
+            recommendation.SummaryMarkdown = recommendation.SummaryMarkdown.TrimEnd() + Environment.NewLine + Environment.NewLine + Solar.Paragraph(solar);
+        }
+
+        State.Recommendation = recommendation;
         await State.SubmitAsync();
         Nav.NavigateTo("/results");
     }

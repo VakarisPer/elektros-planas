@@ -1,0 +1,223 @@
+@page "/assistant"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IDisposable
+@inject QuestionnaireState State
+@inject ElectricityAdvisorAgent Advisor
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Asistentas · Elektros planas</PageTitle>
+
+<div class="assistant-head">
+    <div>
+        <div class="eyebrow">Asmeninis patarėjas</div>
+        <h1>Raskime jums tinkamiausią planą</h1>
+    </div>
+    <div class="head-actions">
+        @if (Advisor.IsAiEnabled)
+        {
+            <span class="pill pill-brand" title="Klausimus parenka AI pagal jūsų atsakymus">✦ AI režimas</span>
+        }
+        else
+        {
+            <span class="pill" title="Nenustatytas OpenRouter raktas – naudojamas taisyklių medis">Standartinis režimas</span>
+        }
+        <button type="button" class="btn btn-ghost btn-sm" @onclick="Restart" disabled="@_busy">Iš naujo</button>
+    </div>
+</div>
+
+<div class="progress-block">
+    <div class="progress-track"><div class="progress-fill" style="width:@ProgressPercent%"></div></div>
+    <div class="progress-meta">
+        <span>Atsakyta: @State.AnsweredQuestions().Count</span>
+        @if (!Advisor.IsFinished)
+        {
+            <span>Liko ~@RemainingEstimate klaus.</span>
+        }
+        else
+        {
+            <span>Baigta</span>
+        }
+    </div>
+</div>
+
+@if (State.Analysis is not { Success: true } && !Advisor.IsFinished)
+{
+    <a class="upload-hint" href="upload">
+        <span class="upload-icon" aria-hidden="true">📈</span>
+        <span><strong>Turite ESO duomenis?</strong> Įkelkite suvartojimo failą – klausimų bus mažiau, o skaičiavimas tikslesnis.</span>
+    </a>
+}
+
+<section class="chat" aria-live="polite">
+    @foreach (var (entry, index) in State.ChatLog.Select((e, i) => (e, i)))
+    {
+        if (entry.FromUser)
+        {
+            <div class="msg msg-user"><div class="bubble">@entry.Text</div></div>
+        }
+        else if (entry.QuestionId is { } qid && Questionnaire.GetQuestion(qid) is { } question)
+        {
+            var isPending = State.PendingQuestionId == qid && index == LastQuestionIndex;
+            <div class="msg msg-bot">
+                <div class="avatar" aria-hidden="true">⚡</div>
+                <div class="bubble @(isPending ? "bubble-active" : null)">
+                    @if (!string.IsNullOrWhiteSpace(entry.Text))
+                    {
+                        <div class="intro">@entry.Text</div>
+                    }
+                    <div class="question-text">@question.Text</div>
+                    @if (isPending)
+                    {
+                        <OptionChips Question="question" Answer="State.GetAnswer(qid)" Disabled="_busy" OnSubmit="AnswerAsync" />
+                    }
+                </div>
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(entry.Text))
+        {
+            <div class="msg msg-bot">
+                <div class="avatar" aria-hidden="true">⚡</div>
+                <div class="bubble md">@Markdown.ToHtml(entry.Text)</div>
+            </div>
+        }
+    }
+
+    @if (_busy)
+    {
+        <div class="msg msg-bot">
+            <div class="avatar" aria-hidden="true">⚡</div>
+            <div class="bubble typing" aria-label="Asistentas galvoja"><span></span><span></span><span></span></div>
+        </div>
+    }
+</section>
+
+@if (Advisor.IsFinished)
+{
+    <div class="panel done-card">
+        <div>
+            <div class="eyebrow">Rekomendacija paruošta</div>
+            <div class="done-plan">@Recommendation.PlanTypeLabel(State.Recommendation!.PlanType) · @State.Recommendation.Supplier</div>
+        </div>
+        <a class="btn btn-primary btn-lg" href="results">Žiūrėti rezultatus →</a>
+    </div>
+}
+else
+{
+    <form class="composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
+        <input class="form-control" placeholder="Parašykite klausimą ar papasakokite apie save…"
+               @bind="_draft" @bind:event="oninput" disabled="@_busy" aria-label="Žinutė asistentui" />
+        <button type="submit" class="btn btn-primary" disabled="@_busy">Siųsti</button>
+    </form>
+
+    @if (State.AnsweredQuestions().Count >= 4)
+    {
+        <div class="finish-now">
+            <button type="button" class="btn btn-link btn-sm" @onclick="FinishNow" disabled="@_busy">
+                Užtenka klausimų – rodyti rekomendaciją dabar
+            </button>
+        </div>
+    }
+}
+
+@code {
+    private readonly CancellationTokenSource _cts = new();
+    private bool _busy;
+    private string? _draft;
+    private bool _scroll;
+
+    private int LastQuestionIndex => State.ChatLog.FindLastIndex(e => e.QuestionId is not null);
+
+    private int RemainingEstimate
+    {
+        get
+        {
+            var available = Questionnaire.Questions.Count(q => State.IsVisible(q) && !State.IsQuestionAnswered(q));
+            // The AI usually needs well under the full tree; show a realistic, capped estimate.
+            var cap = Math.Max(1, 10 - State.AskedQuestionIds.Count);
+            return Math.Max(1, Math.Min(available, cap));
+        }
+    }
+
+    private int ProgressPercent
+    {
+        get
+        {
+            if (Advisor.IsFinished) return 100;
+            var done = State.AnsweredQuestions().Count;
+            return (int)Math.Round(done * 100.0 / (done + RemainingEstimate));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.LoadAsync();
+        await RunAsync(() => Advisor.StartAsync(_cts.Token));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_scroll || firstRender)
+        {
+            _scroll = false;
+            try { await JS.InvokeVoidAsync("elektra.scrollToBottom"); }
+            catch (JSDisconnectedException) { }
+        }
+    }
+
+    private Task AnswerAsync() => RunAsync(() => Advisor.AnswerPendingAsync(_cts.Token));
+
+    private Task FinishNow() => RunAsync(() => Advisor.FinishNowAsync(_cts.Token));
+
+    private async Task SendAsync()
+    {
+        var text = _draft?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        _draft = string.Empty;
+        await RunAsync(() => Advisor.SendFreeTextAsync(text, _cts.Token));
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _scroll = true;
+        StateHasChanged();
+
+        try
+        {
+            await action();
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            _busy = false;
+            _scroll = true;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task Restart()
+    {
+        await State.ResetAsync();
+        Nav.NavigateTo("/assistant", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

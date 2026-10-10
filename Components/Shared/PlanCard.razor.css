@@ -1,0 +1,108 @@
+.plan-card {
+    position: relative;
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+}
+
+    .plan-card.is-rec {
+        border-color: var(--brand);
+    }
+
+.plan-ribbon {
+    position: absolute;
+    top: -.7rem;
+    right: 1rem;
+    background: var(--brand);
+    color: var(--brand-ink);
+    font-size: .72rem;
+    font-weight: 700;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+}
+
+.plan-type {
+    font-weight: 700;
+}
+
+.plan-name {
+    color: var(--muted);
+    font-size: .88rem;
+}
+
+.plan-cost {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -.03em;
+    margin-top: .5rem;
+}
+
+    .plan-cost span {
+        font-size: .9rem;
+        font-weight: 500;
+        color: var(--muted);
+        margin-left: .3rem;
+    }
+
+.plan-sub {
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.range {
+    position: relative;
+    height: 10px;
+    margin: 1rem 0 .3rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+}
+
+.range-bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--ok), var(--accent), var(--danger));
+    opacity: .75;
+}
+
+.range-dot {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--ink);
+    transform: translate(-50%, -50%);
+}
+
+.range-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: .75rem;
+    color: var(--muted);
+}
+
+.plan-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .85rem;
+}
+
+.delta {
+    font-size: .85rem;
+    font-weight: 700;
+}
+
+    .delta.pos { color: var(--ok); }
+    .delta.neg { color: var(--danger); }
+

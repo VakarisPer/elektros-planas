@@ -1,0 +1,82 @@
+.hero {
+    padding: 2.5rem 0 2rem;
+    max-width: 760px;
+}
+
+    .hero h1 {
+        font-size: clamp(2rem, 5vw, 3.1rem);
+        font-weight: 800;
+        letter-spacing: -.035em;
+        line-height: 1.08;
+        margin: 1rem 0;
+    }
+
+.grad {
+    background: linear-gradient(90deg, var(--brand), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.lead-text {
+    font-size: 1.12rem;
+    color: var(--muted);
+    max-width: 620px;
+}
+
+.cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    margin-top: 1.5rem;
+}
+
+.steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.step h2 {
+    font-size: 1.05rem;
+    margin: .75rem 0 .35rem;
+}
+
+.step p {
+    color: var(--muted);
+    margin: 0;
+    font-size: .95rem;
+}
+
+.step-num {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    background: var(--brand-soft);
+    color: var(--brand);
+}
+
+.compare h2 {
+    font-size: 1.15rem;
+    margin-bottom: 1rem;
+}
+
+.compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+}
+
+    .compare-grid p {
+        color: var(--muted);
+        font-size: .93rem;
+        margin: .3rem 0 0;
+    }
+
+.compare-title {
+    font-weight: 700;
+}

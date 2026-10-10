@@ -24,4 +24,16 @@ public sealed class ConsumptionAnalysis
 
     /// <summary>Peak period mapped to a Q15 option label, when hourly data is available.</summary>
     public string? PeakPeriodLabel { get; set; }
+
+    /// <summary>
+    /// Average monthly energy given back to the grid (ESO "P-", own solar plant), kWh.
+    /// When set, <see cref="MonthlyAverageKwh"/> is grid import only, not total consumption.
+    /// </summary>
+    public double? ExportedMonthlyKwh { get; set; }
+
+    /// <summary>Average grid import per hour, kWh, indexed month × 24 + hour (hourly files only).</summary>
+    public double[]? ImportMatrix { get; set; }
+
+    /// <summary>Average export to the grid per hour, kWh, indexed month × 24 + hour (prosumers only).</summary>
+    public double[]? ExportMatrix { get; set; }
 }

@@ -1,13 +1,11 @@
 <div class="mb-2">
-    <div class="small text-muted">Klausimas @Current iš @Total</div>
-    <div class="progress mt-1"
-         role="progressbar"
-         aria-label="Apklausos progresas"
-         aria-valuenow="@Percent"
-         aria-valuemin="0"
-         aria-valuemax="100"
-         style="height: 8px;">
-        <div class="progress-bar" style="width: @Percent%"></div>
+    <div class="d-flex justify-content-between small muted mb-1">
+        <span>Klausimas @Current iš @Total</span>
+        <span>@Percent %</span>
+    </div>
+    <div class="progress-track" role="progressbar" aria-label="Apklausos progresas"
+         aria-valuenow="@Percent" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-fill" style="width: @Percent%"></div>
     </div>
 </div>
 
