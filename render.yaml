@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: elektros-planas
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: OpenRouter__ApiKey
+        sync: false
